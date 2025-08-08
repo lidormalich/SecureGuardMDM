@@ -211,7 +211,7 @@
     <string name="unofficial_build_warning_title">אזהרת אבטחה</string>
     <string name="unofficial_build_warning_message">אפליקציה זו אינה רשמית ונעשו בה שינויים!</string>
     <!-- App Info Dialog -->
-    <string name="app_build_status">רשמית</string> <!-- שנה ל"לא רשמית" או כל טקסט אחר עבור גרסאות מקוד המקור -->
+    <string name="app_build_status">לא רישימית</string>
     <string name="contact_email">c51525355@gmail.com</string>
     <string name="unofficial_warning_title">אזהרת אבטחה</string>
     <string name="unofficial_warning_message">אפליקציה זו אינה רשמית ונעשו בה שינויים!</string>
