@@ -87,7 +87,7 @@ private fun sendEmail(context: Context) {
     val intent = Intent(Intent.ACTION_SENDTO).apply {
         data = Uri.parse("mailto:")
         putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
-        putExtra(Intent.EXTRA_SUBJECT, "SecureGuard App Inquiry")
+        putExtra(Intent.EXTRA_SUBJECT, "Abloq App Inquiry")
     }
     try {
         context.startActivity(intent)

@@ -12,6 +12,8 @@ interface SettingsRepository {
     suspend fun setSetupComplete(isComplete: Boolean)
     suspend fun getOriginalDialerPackage(): String?
     suspend fun setOriginalDialerPackage(packageName: String?)
+    suspend fun isAutoUpdateCheckEnabled(): Boolean // <-- פונקציה חדשה
+    suspend fun setAutoUpdateCheckEnabled(isEnabled: Boolean) // <-- פונקציה חדשה
 
     // --- פעולות FRP ---
     suspend fun getCustomFrpIds(): Set<String>

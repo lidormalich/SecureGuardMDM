@@ -46,6 +46,14 @@ class SettingsRepositoryImpl @Inject constructor(
         preferencesManager.saveString(PreferencesManager.KEY_ORIGINAL_DIALER_PACKAGE, packageName)
     }
 
+    override suspend fun isAutoUpdateCheckEnabled(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_AUTO_UPDATE_CHECK_ENABLED, true) // Default is true
+    }
+
+    override suspend fun setAutoUpdateCheckEnabled(isEnabled: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_AUTO_UPDATE_CHECK_ENABLED, isEnabled)
+    }
+
     // --- מימוש פונקציות FRP ---
     override suspend fun getCustomFrpIds(): Set<String> = withContext(Dispatchers.IO) {
         preferencesManager.loadStringSet(PreferencesManager.KEY_CUSTOM_FRP_IDS, emptySet())

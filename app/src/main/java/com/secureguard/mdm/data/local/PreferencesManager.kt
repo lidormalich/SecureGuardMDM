@@ -19,6 +19,7 @@ class PreferencesManager @Inject constructor(private val prefs: SharedPreference
         const val KEY_IS_SETUP_COMPLETE = "is_setup_complete"
         const val KEY_BLOCKED_APP_PACKAGES = "blocked_app_packages"
         const val KEY_ORIGINAL_DIALER_PACKAGE = "original_dialer_package"
-        const val KEY_CUSTOM_FRP_IDS = "custom_frp_ids" // <-- מפתח חדש
+        const val KEY_CUSTOM_FRP_IDS = "custom_frp_ids"
+        const val KEY_AUTO_UPDATE_CHECK_ENABLED = "auto_update_check_enabled" // <-- מפתח חדש
     }
 }

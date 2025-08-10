@@ -9,6 +9,7 @@ import com.secureguard.mdm.data.db.BlockedAppCacheDao
 import com.secureguard.mdm.data.repository.SettingsRepository
 import com.secureguard.mdm.data.repository.SettingsRepositoryImpl
 import com.secureguard.mdm.utils.SecureUpdateHelper
+import com.secureguard.mdm.utils.update.UpdateManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -64,5 +65,11 @@ object AppModule {
     @Singleton
     fun provideSecureUpdateHelper(@ApplicationContext context: Context): SecureUpdateHelper {
         return SecureUpdateHelper(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUpdateManager(@ApplicationContext context: Context, secureUpdateHelper: SecureUpdateHelper): UpdateManager {
+        return UpdateManager(context, secureUpdateHelper)
     }
 }

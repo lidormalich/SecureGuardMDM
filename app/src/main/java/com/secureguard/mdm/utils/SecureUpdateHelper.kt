@@ -7,6 +7,7 @@ import android.content.pm.Signature
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import com.secureguard.mdm.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import javax.inject.Inject
@@ -38,42 +39,18 @@ class SecureUpdateHelper @Inject constructor(
 ) {
     private val pm: PackageManager = context.packageManager
 
-
-    companion object {
-        private val VALIDATION_ARRAY: IntArray = intArrayOf(
-            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
-        )
-
-        // This key is used for the simple XOR obfuscation/de-obfuscation.
-        private const val TRANSFORM_FACTOR = 123
-    }
-
     /**
-     * Checks if the currently running application has the official signature.
-     * This is done by de-obfuscating the stored validation array and comparing its
-     * hash to the hash of the current application's signature.
+     * Checks if the currently running application is an official build.
+     * This check is now based solely on the value of a string resource.
      */
-    fun isLegitimate(): Boolean {
-        // Prevent running on emulators or in debug builds for this check if needed
-        // if (BuildConfig.DEBUG) return true // Or false, depending on desired behavior
-
-        val currentSignatureHash = getAppSignatureSha256(context) ?: return false
-        val officialSignatureHash = deobfuscate()
-
-        return currentSignatureHash == officialSignatureHash
+    fun isOfficialBuild(): Boolean {
+        return try {
+            context.getString(R.string.app_build_status).equals("רשמית", ignoreCase = true)
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    /**
-     * De-obfuscates the VALIDATION_ARRAY back to the original SHA-256 hash string.
-     */
-    private fun deobfuscate(): String {
-        return VALIDATION_ARRAY
-            .map { it xor TRANSFORM_FACTOR }
-            .map { it.toByte() }
-            .toByteArray()
-            .joinToString("") { "%02x".format(it) }
-    }
 
     private fun getAppSignatureSha256(context: Context): String? {
         try {
@@ -108,6 +85,44 @@ class SecureUpdateHelper @Inject constructor(
     fun coreComponentExists(): Boolean = true
 
     // --- סוף: לוגיקת אימות חתימה רשמית (מטושטשת) ---
+
+    /**
+     * Verifies if a downloaded APK file has the same signature as the currently installed app.
+     * @param localApkPath The absolute path to the downloaded APK file in the app's internal storage.
+     * @return True if signatures match, false otherwise.
+     */
+    fun verifyLocalApkSignature(localApkPath: String): Boolean {
+        try {
+            // Get signature from the downloaded APK
+            val archiveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageArchiveInfo(localApkPath, PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageArchiveInfo(localApkPath, PackageManager.GET_SIGNATURES)
+            } ?: return false
+
+            val apkSignatures = getSignaturesFromPackageInfo(archiveInfo)
+            if (apkSignatures.isEmpty()) return false
+            val apkSignature = apkSignatures.first()
+
+            // Get signature from the installed app
+            val installedPackageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+            }
+            val installedSignatures = getSignaturesFromPackageInfo(installedPackageInfo)
+            if (installedSignatures.isEmpty()) return false
+            val installedSignature = installedSignatures.first()
+
+            // Compare
+            return apkSignature == installedSignature
+        } catch (e: Exception) {
+            Log.e("SecureUpdateHelper", "Signature verification for local APK failed", e)
+            return false
+        }
+    }
 
 
     fun verifyUpdate(apkUri: Uri): UpdateVerificationResult {

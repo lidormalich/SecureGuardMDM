@@ -29,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.secureguard.mdm.R
 import com.secureguard.mdm.ui.components.PasswordPromptDialog
+import com.secureguard.mdm.ui.screens.dashboard.update.UpdateDialog
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,7 +80,7 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text(stringResource(id = R.string.dashboard_title)) },
                 actions = {
-                    // --- כפתור עדכון ---
+                    // --- כפתור עדכון ידני ---
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
@@ -89,7 +90,7 @@ fun DashboardScreen(
                     }) {
                         Icon(Icons.Default.SystemUpdate, contentDescription = stringResource(R.string.dashboard_button_update_app))
                     }
-                    // --- כפתור מידע חדש ---
+                    // --- כפתור מידע ---
                     IconButton(onClick = { showAppInfoDialog = true }) {
                         Icon(painterResource(id = R.drawable.ic_info), contentDescription = "אודות האפליקציה")
                     }
@@ -136,9 +137,15 @@ fun DashboardScreen(
         )
     }
 
-    // --- הצגת דיאלוג המידע ---
     if (showAppInfoDialog) {
         AppInfoDialog(onDismiss = { showAppInfoDialog = false })
+    }
+
+    if (uiState.updateDialogState != UpdateDialogState.HIDDEN) {
+        UpdateDialog(
+            uiState = uiState,
+            onEvent = viewModel::onEvent
+        )
     }
 }
 

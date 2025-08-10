@@ -71,8 +71,17 @@ class SettingsViewModel @Inject constructor(
             is SettingsEvent.OnSnackbarShown -> _uiState.update { it.copy(snackbarMessage = null) }
             is SettingsEvent.OnRemoveProtectionRequest -> _passwordPromptState.update { it.copy(isVisible = true) }
             is SettingsEvent.OnVpnPermissionResult -> handleVpnPermissionResult(event.granted)
+            is SettingsEvent.OnAutoUpdateToggled -> handleAutoUpdateToggle(event.isEnabled)
         }
     }
+
+    private fun handleAutoUpdateToggle(isEnabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setAutoUpdateCheckEnabled(isEnabled)
+            _uiState.update { it.copy(isAutoUpdateEnabled = isEnabled) }
+        }
+    }
+
 
     fun onPasswordPromptEvent(event: PasswordPromptEvent) {
         when (event) {
@@ -134,6 +143,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
+            val isAutoUpdateEnabled = settingsRepository.isAutoUpdateCheckEnabled()
             val isNetGuardInstalled = isNetGuardInstalled()
             val currentDeviceApi = Build.VERSION.SDK_INT
 
@@ -157,7 +167,11 @@ class SettingsViewModel @Inject constructor(
                 }
                 CategoryToggle(titleResId = category.titleResId, toggles = featureToggles)
             }
-            _uiState.update { it.copy(categoryToggles = categoryToggles, isLoading = false) }
+            _uiState.update { it.copy(
+                categoryToggles = categoryToggles,
+                isLoading = false,
+                isAutoUpdateEnabled = isAutoUpdateEnabled
+            ) }
         }
     }
 

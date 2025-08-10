@@ -124,7 +124,6 @@ fun SettingsScreen(
                         FeatureToggleRow(
                             toggle = toggle,
                             onToggle = { isEnabled ->
-                                // --- לוגיקה חדשה: הצג אזהרה לפני הפעלת FRP ---
                                 if (toggle.feature.id == FrpProtectionFeature.id && isEnabled) {
                                     showFrpWarningDialog = true
                                 } else {
@@ -163,6 +162,14 @@ fun SettingsScreen(
 
                 item {
                     Text("פעולות נוספות", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+                }
+                item {
+                    SettingsToggleItem(
+                        title = stringResource(id = R.string.settings_item_auto_update_check),
+                        iconRes = R.drawable.ic_system_update,
+                        isChecked = uiState.isAutoUpdateEnabled,
+                        onCheckedChange = { isEnabled -> viewModel.onEvent(SettingsEvent.OnAutoUpdateToggled(isEnabled)) }
+                    )
                 }
                 item {
                     SettingsActionItem(
@@ -220,7 +227,6 @@ fun SettingsScreen(
         )
     }
 
-    // --- דיאלוג אזהרה חדש עבור FRP ---
     if (showFrpWarningDialog) {
         InfoDialog(
             title = stringResource(id = R.string.frp_warning_dialog_title),
@@ -256,7 +262,6 @@ private fun FeatureToggleRow(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // --- הוספת התג "נסיוני" ---
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -313,6 +318,21 @@ fun SettingsActionItem(title: String, iconRes: Int, onClick: () -> Unit, isDestr
             Icon(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp), tint = color)
             Spacer(modifier = Modifier.width(16.dp))
             Text(text = title, style = MaterialTheme.typography.bodyLarge, color = color)
+        }
+    }
+}
+
+@Composable
+fun SettingsToggleItem(title: String, iconRes: Int, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!isChecked) }) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(text = title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Switch(checked = isChecked, onCheckedChange = onCheckedChange)
         }
     }
 }

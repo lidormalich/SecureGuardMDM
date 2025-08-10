@@ -1,12 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- app info -->
-    <string name="app_name">Secure Guard</string>
-    <string name="device_admin_description">מאפשר ל-Secure Guard לאכוף מדיניות אבטחה על המכשיר.</string>
+    <string name="app_name">Abloq</string>
+    <string name="app_version_code" translatable="false">1</string> <!-- מספר הגרסה הפנימי של האפליקציה -->
+    <string name="device_admin_description">מאפשר ל-Abloq לאכוף מדיניות אבטחה על המכשיר.</string>
     <string name="app_version">בטא 0.4.1</string>
+    <!-- App Info Dialog -->
+    <string name="unofficial_warning_title">אזהרת אבטחה</string>
+    <string name="unofficial_warning_message">אפליקציה זו אינה רשמית ונעשו בה שינויים!</string>
 
     <!-- Provisioning Screen -->
     <string name="provisioning_title">נדרשות הרשאות ניהול</string>
-    <string name="provisioning_description">כדי ש-Secure Guard תוכל לפעול, עליה להיות מוגדרת כ"בעלת המכשיר" (Device Owner). ניתן לעשות זאת רק במכשיר חדש או מאופס.</string>
+    <string name="provisioning_description">כדי ש-Abloq תוכל לפעול, עליה להיות מוגדרת כ"בעלת המכשיר" (Device Owner). ניתן לעשות זאת רק במכשיר חדש או מאופס.</string>
     <string name="provisioning_option_adb">אפשרות 1: הפעלה באמצעות ADB (מומלץ)</string>
     <string name="provisioning_adb_instructions">1. התקן את האפליקציה על המכשיר.\n2. הפעל "אפשרויות למפתחים" ו-"ניפוי באגים ב-USB".\n3. חבר את המכשיר למחשב והרץ את הפקודה הבאה:</string>
     <string name="provisioning_adb_command">adb shell dpm set-device-owner com.secureguard.mdm/.SecureGuardDeviceAdminReceiver</string>
@@ -20,7 +25,7 @@
     <string name="provisioning_root_failed">ההפעלה עם Root נכשלה.</string>
 
     <!-- Setup Screen -->
-    <string name="setup_title">ברוכים הבאים ל-Secure Guard</string>
+    <string name="setup_title">ברוכים הבאים ל-Abloq</string>
     <string name="setup_description">כדי להתחיל, אנא צור סיסמת ניהול. סיסמה זו תשמש לשינוי הגדרות האבטחה.</string>
     <string name="setup_password_label">סיסמה</string>
     <string name="setup_confirm_password_label">אימות סיסמה</string>
@@ -42,12 +47,13 @@
     <string name="settings_unsupported_device">לא נתמך במכשיר זה</string>
     <string name="settings_unsupported_device_details">דורש אנדרואיד %1$d (%2$s) ומעלה.</string>
     <string name="settings_item_change_password">שנה סיסמת ניהול</string>
-    <string name="settings_item_remove_protection">הסר את SecureGuard וההגנות</string>
+    <string name="settings_item_remove_protection">הסר את Abloq וההגנות</string>
     <string name="settings_remove_protection_dialog_title">האם אתה בטוח?</string>
     <string name="settings_remove_protection_dialog_message">פעולה זו תסיר את כל ההגנות, תמחק את הרשאות הניהול של האפליקציה ותבקש ממך להסיר את התקנתה. לא ניתן לבטל פעולה זו.</string>
     <string name="settings_item_select_apps_to_block">בחר אפליקציות לחסימה</string>
     <string name="settings_item_view_blocked_apps">הצג אפליקציות חסומות</string>
     <string name="settings_item_change_default_dialer">שנה אפליקציית טלפון ראשית</string>
+    <string name="settings_item_auto_update_check">בדוק עדכונים אוטומטית בכניסה</string>
 
     <!-- Toasts for Call Blocker -->
     <string name="toast_hiding_dialer">מסתיר את אפליקציית הטלפון המקורית (%s)...</string>
@@ -74,13 +80,25 @@
     <string name="dialog_description_unsupported_feature">התכונה \'%1$s\' דורשת מערכת אנדרואיד בגרסה %2$d (%3$s) ומעלה. הגרסה במכשירך היא %4$d (%5$s).</string>
     <string name="dialog_changes_saved_successfully">ההגדרות נשמרו בהצלחה!</string>
 
-    <!-- Secure Update Toasts -->
+    <!-- Secure Update & Auto Update -->
+    <string name="app_build_status" translatable="false">רשמית</string> <!-- שנה ל"לא רשמית" בגרסאות פיתוח -->
+    <string name="update_version_url" translatable="false">https://raw.githubusercontent.com/sesese1234/SecureGuardMDM/refs/heads/main/version.txt</string>
+    <string name="update_changelog_url" translatable="false">https://raw.githubusercontent.com/sesese1234/SecureGuardMDM/refs/heads/main/changes.txt</string>
+    <string name="update_apk_download_url" translatable="false">https://github.com/sesese1234/SecureGuardMDM/releases/download/Beta/SecureGuard-release.apk</string>
+    <string name="update_dialog_title">עדכון זמין</string>
+    <string name="update_dialog_changelog_title">יומן שינויים:</string>
+    <string name="update_dialog_button_download">הורד והתקן</string>
+    <string name="update_dialog_button_later">מאוחר יותר</string>
+    <string name="update_dialog_downloading">מוריד עדכון...</string>
     <string name="update_toast_success">העדכון הותקן בהצלחה.</string>
     <string name="update_toast_failed">העדכון בוטל או נכשל.</string>
     <string name="update_error_file_read">שגיאה בקריאת קובץ ה-APK.</string>
     <string name="update_error_app_not_installed">האפליקציה המיועדת לעדכון אינה מותקנת.</string>
     <string name="update_error_signature_mismatch">שגיאה: חתימת העדכון אינה תואמת לאפליקציה המותקנת.</string>
     <string name="update_error_no_signature">לא נמצאה חתימה בקובץ ה-APK.</string>
+    <string name="update_error_verification_failed">אימות העדכון נכשל. הקובץ נמחק.</string>
+    <string name="update_error_download_failed">הורדת העדכון נכשלה.</string>
+
 
     <!-- Feature Titles & Descriptions -->
     <string name="feature_block_incoming_calls_title">חסימת טלפון לגמרי (שיחות)</string>
@@ -208,11 +226,5 @@
     <string name="frp_warning_dialog_title">אזהרה: תכונה נסיונית</string>
     <string name="frp_warning_dialog_message">הפעלת הגנת FRP היא פעולה מתקדמת שעלולה, במקרים נדירים או בתצורה שגויה, לנעול את המכשיר לצמיתות ולדרוש התערבות יצרן. האם אתה בטוח שברצונך להמשיך?</string>
     <!-- App Info Dialog -->
-    <string name="unofficial_build_warning_title">אזהרת אבטחה</string>
-    <string name="unofficial_build_warning_message">אפליקציה זו אינה רשמית ונעשו בה שינויים!</string>
-    <!-- App Info Dialog -->
-    <string name="app_build_status">רשמית</string> <!-- שנה ל"לא רשמית" או כל טקסט אחר עבור גרסאות מקוד המקור -->
     <string name="contact_email">c51525355@gmail.com</string>
-    <string name="unofficial_warning_title">אזהרת אבטחה</string>
-    <string name="unofficial_warning_message">אפליקציה זו אינה רשמית ונעשו בה שינויים!</string>
 </resources>

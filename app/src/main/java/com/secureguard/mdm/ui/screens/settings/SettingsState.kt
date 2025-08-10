@@ -18,13 +18,15 @@ data class FeatureToggle(
 data class SettingsUiState(
     val categoryToggles: List<CategoryToggle> = emptyList(),
     val isLoading: Boolean = true,
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val isAutoUpdateEnabled: Boolean = true // <-- מצב חדש
 )
 
 sealed class SettingsEvent {
     data class OnToggleFeature(val featureId: String, val isEnabled: Boolean) : SettingsEvent()
     object OnSaveClick : SettingsEvent()
     object OnSnackbarShown : SettingsEvent()
-    object OnRemoveProtectionRequest : SettingsEvent() // Password will be requested for this
+    object OnRemoveProtectionRequest : SettingsEvent()
     data class OnVpnPermissionResult(val granted: Boolean) : SettingsEvent()
+    data class OnAutoUpdateToggled(val isEnabled: Boolean) : SettingsEvent() // <-- אירוע חדש
 }

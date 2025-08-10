@@ -10,11 +10,11 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.secureguard.mdm"
+        applicationId = "com.abloq.mdm"
         minSdk = 22
         targetSdk = 34
         versionCode = 1
-        versionName = "0.4.0"
+        versionName = "0.4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
