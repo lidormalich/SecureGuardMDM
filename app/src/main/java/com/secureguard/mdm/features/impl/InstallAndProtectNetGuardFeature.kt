@@ -31,14 +31,12 @@ object InstallAndProtectNetGuardFeature : ProtectionFeature {
     override fun applyPolicy(context: Context, dpm: DevicePolicyManager, admin: ComponentName, enable: Boolean) {
         if (enable) {
             CoroutineScope(Dispatchers.IO).launch {
-                // Install if not already present
                 if (!isAppInstalled(context, NETGUARD_PACKAGE_NAME)) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, R.string.toast_installing_netguard, Toast.LENGTH_SHORT).show()
                     }
                     installNetGuardApp(context)
                 }
-                // Always ensure uninstall is blocked when enabled
                 try {
                     dpm.setUninstallBlocked(admin, NETGUARD_PACKAGE_NAME, true)
                     Log.d(TAG, "Successfully blocked uninstall for NetGuard.")
@@ -47,13 +45,12 @@ object InstallAndProtectNetGuardFeature : ProtectionFeature {
                 }
             }
         } else {
-            // Unblock uninstall and notify user
+            // -- התיקון כאן: הסרת ה-Toast --
+            // הלוגיקה הזו מבוצעת בכל שמירה, ולכן ההודעה צריכה להיות מנוהלת ע"י ה-ViewModel
+            // שיודע מתי באמת התבצע שינוי במצב.
             try {
                 dpm.setUninstallBlocked(admin, NETGUARD_PACKAGE_NAME, false)
                 Log.d(TAG, "Successfully unblocked uninstall for NetGuard.")
-                CoroutineScope(Dispatchers.Main).launch {
-                    Toast.makeText(context, R.string.toast_netguard_can_be_uninstalled, Toast.LENGTH_LONG).show()
-                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unblock uninstall for NetGuard.", e)
             }

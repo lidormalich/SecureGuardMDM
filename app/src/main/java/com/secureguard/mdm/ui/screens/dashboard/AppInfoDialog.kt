@@ -20,6 +20,8 @@ import com.secureguard.mdm.ui.components.InfoDialog
 
 @Composable
 fun AppInfoDialog(
+    isContactEmailVisible: Boolean,
+    onCheckForUpdateClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -51,11 +53,23 @@ fun AppInfoDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                sendEmail(context)
-                onDismiss()
-            }) {
-                Text("צור קשר במייל")
+            Row {
+                if (isOfficial) {
+                    TextButton(onClick = {
+                        onCheckForUpdateClick()
+                        onDismiss()
+                    }) {
+                        Text(stringResource(id = R.string.check_for_updates))
+                    }
+                }
+                if (isContactEmailVisible) {
+                    Button(onClick = {
+                        sendEmail(context)
+                        onDismiss()
+                    }) {
+                        Text("צור קשר במייל")
+                    }
+                }
             }
         },
         dismissButton = {
@@ -87,7 +101,7 @@ private fun sendEmail(context: Context) {
     val intent = Intent(Intent.ACTION_SENDTO).apply {
         data = Uri.parse("mailto:")
         putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
-        putExtra(Intent.EXTRA_SUBJECT, "Abloq App Inquiry")
+        putExtra(Intent.EXTRA_SUBJECT, "A bloq App Inquiry")
     }
     try {
         context.startActivity(intent)

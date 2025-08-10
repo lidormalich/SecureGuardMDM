@@ -1,11 +1,14 @@
 package com.secureguard.mdm.utils.update
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageInstaller
 import android.util.Log
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.secureguard.mdm.R
+import com.secureguard.mdm.receivers.InstallReceiver
 import com.secureguard.mdm.utils.SecureUpdateHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -15,13 +18,16 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.max
 
 private const val TAG = "UpdateManager"
 private const val UPDATE_FILE_NAME = "update.apk"
+private const val INSTALL_SESSION_NAME = "AbloqUpdateSession"
 
 sealed class UpdateResult {
     data class UpdateAvailable(val info: UpdateInfo) : UpdateResult()
@@ -41,6 +47,25 @@ class UpdateManager @Inject constructor(
     private val secureUpdateHelper: SecureUpdateHelper
 ) {
 
+    /**
+     * Compares two version name strings (e.g., "1.2.3" vs "1.2.10").
+     * @return A positive integer if remoteVersion is greater, a negative integer if localVersion is greater,
+     * or 0 if they are equal.
+     */
+    private fun compareVersionNames(localVersion: String, remoteVersion: String): Int {
+        val localParts = localVersion.split('.').map { it.toIntOrNull() ?: 0 }
+        val remoteParts = remoteVersion.split('.').map { it.toIntOrNull() ?: 0 }
+        val partCount = max(localParts.size, remoteParts.size)
+
+        for (i in 0 until partCount) {
+            val localPart = localParts.getOrElse(i) { 0 }
+            val remotePart = remoteParts.getOrElse(i) { 0 }
+            if (remotePart > localPart) return 1
+            if (localPart > remotePart) return -1
+        }
+        return 0
+    }
+
     suspend fun checkForUpdate(): UpdateResult = withContext(Dispatchers.IO) {
         if (!secureUpdateHelper.isOfficialBuild()) {
             Log.d(TAG, "Update check skipped: Not an official build.")
@@ -48,21 +73,19 @@ class UpdateManager @Inject constructor(
         }
 
         try {
-            val remoteVersionCode = URL(context.getString(R.string.update_version_url)).readText().trim().toIntOrNull()
-                ?: throw Exception("Invalid version format from server")
+            val remoteVersionName = URL(context.getString(R.string.update_version_url)).readText().trim()
+            val currentVersionName = context.getString(R.string.app_version_name_for_logic)
 
-            val currentVersionCode = context.getString(R.string.app_version_code).toIntOrNull() ?: 1
+            Log.d(TAG, "Remote version: $remoteVersionName, Current version: $currentVersionName")
 
-            Log.d(TAG, "Remote version: $remoteVersionCode, Current version: $currentVersionCode")
-
-            if (remoteVersionCode > currentVersionCode) {
+            if (compareVersionNames(currentVersionName, remoteVersionName) > 0) {
                 Log.i(TAG, "Update available. Fetching changelog...")
                 val changelog = URL(context.getString(R.string.update_changelog_url)).readText().trim()
                 val downloadUrl = context.getString(R.string.update_apk_download_url)
 
                 val updateInfo = UpdateInfo(
-                    versionCode = remoteVersionCode,
-                    versionName = "Unknown",
+                    versionCode = 0, // Not used for logic anymore, but kept for structure
+                    versionName = remoteVersionName,
                     changelog = changelog,
                     downloadUrl = downloadUrl
                 )
@@ -107,30 +130,62 @@ class UpdateManager @Inject constructor(
 
             Log.d(TAG, "Download complete. Verifying signature...")
             if (secureUpdateHelper.verifyLocalApkSignature(outputFile.absolutePath)) {
-                Log.d(TAG, "Signature verified. Proceeding to install.")
-                installApk(outputFile)
+                Log.d(TAG, "Signature verified. Proceeding to MDM install.")
+                installApkSilently(outputFile)
             } else {
                 Log.e(TAG, "Signature verification failed!")
-                outputFile.delete()
                 throw Exception(context.getString(R.string.update_error_verification_failed))
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Download failed", e)
-            outputFile.delete()
+            Log.e(TAG, "Download or installation failed", e)
             close(e) // Propagate error to the collector
+        } finally {
+            if (outputFile.exists()) {
+                outputFile.delete()
+            }
         }
         awaitClose { /* Cleanup if needed */ }
     }.flowOn(Dispatchers.IO)
 
-    private fun installApk(file: File) {
-        val authority = "${context.packageName}.provider"
-        val uri = FileProvider.getUriForFile(context, authority, file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    private suspend fun installApkSilently(apkFile: File) {
+        var session: PackageInstaller.Session? = null
+        try {
+            val packageInstaller = context.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            val sessionId = packageInstaller.createSession(params)
+            session = packageInstaller.openSession(sessionId)
+
+            FileInputStream(apkFile).use { fileInputStream ->
+                session.openWrite(INSTALL_SESSION_NAME, 0, apkFile.length()).use { sessionOutputStream ->
+                    fileInputStream.copyTo(sessionOutputStream)
+                    session.fsync(sessionOutputStream)
+                }
+            }
+
+            Log.d(TAG, "APK file written to session. Committing installation.")
+
+            // --- התיקון כאן ---
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "מתקין עדכון, האפליקציה תופעל מחדש...", Toast.LENGTH_LONG).show()
+            }
+
+            val intent = Intent(context, InstallReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                sessionId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+
+            session.commit(pendingIntent.intentSender)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Silent installation failed.", e)
+            session?.abandon()
+            throw e
+        } finally {
+            session?.close()
         }
-        context.startActivity(intent)
     }
 }

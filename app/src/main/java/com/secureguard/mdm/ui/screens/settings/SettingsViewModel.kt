@@ -12,6 +12,7 @@ import com.secureguard.mdm.R
 import com.secureguard.mdm.SecureGuardDeviceAdminReceiver
 import com.secureguard.mdm.data.repository.SettingsRepository
 import com.secureguard.mdm.features.impl.BlockInternetVpnFeature
+import com.secureguard.mdm.features.impl.InstallAndProtectNetGuardFeature
 import com.secureguard.mdm.features.registry.CategoryRegistry
 import com.secureguard.mdm.features.registry.FeatureRegistry
 import com.secureguard.mdm.security.PasswordManager
@@ -41,7 +42,6 @@ class SettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState = _uiState.asStateFlow()
 
-    // Additional state for password prompt, handled separately now
     private val _passwordPromptState = MutableStateFlow(PasswordPromptState())
     val passwordPromptState = _passwordPromptState.asStateFlow()
 
@@ -67,26 +67,108 @@ class SettingsViewModel @Inject constructor(
     fun onEvent(event: SettingsEvent) {
         when (event) {
             is SettingsEvent.OnToggleFeature -> handleToggle(event.featureId, event.isEnabled)
-            is SettingsEvent.OnSaveClick -> saveChanges() // Direct call, no password
+            is SettingsEvent.OnSaveClick -> saveChanges()
             is SettingsEvent.OnSnackbarShown -> _uiState.update { it.copy(snackbarMessage = null) }
             is SettingsEvent.OnRemoveProtectionRequest -> _passwordPromptState.update { it.copy(isVisible = true) }
             is SettingsEvent.OnVpnPermissionResult -> handleVpnPermissionResult(event.granted)
-            is SettingsEvent.OnAutoUpdateToggled -> handleAutoUpdateToggle(event.isEnabled)
+            is SettingsEvent.OnAutoUpdateToggled -> _uiState.update { it.copy(isAutoUpdateEnabled = event.isEnabled) }
+            is SettingsEvent.OnTogglePositionChanged -> _uiState.update { it.copy(isToggleOnStart = event.isStart) }
+            is SettingsEvent.OnControlTypeChanged -> _uiState.update { it.copy(useCheckbox = event.useCheckbox) }
+            is SettingsEvent.OnContactEmailVisibilityChanged -> _uiState.update { it.copy(isContactEmailVisible = event.isVisible) }
+            is SettingsEvent.OnDisableAllUpdatesChanged -> _uiState.update { it.copy(areAllUpdatesDisabled = event.isDisabled) }
+            is SettingsEvent.OnLockSettingsConfirmed -> lockSettings(event.allowManualUpdate)
         }
     }
-
-    private fun handleAutoUpdateToggle(isEnabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setAutoUpdateCheckEnabled(isEnabled)
-            _uiState.update { it.copy(isAutoUpdateEnabled = isEnabled) }
-        }
-    }
-
 
     fun onPasswordPromptEvent(event: PasswordPromptEvent) {
         when (event) {
             is PasswordPromptEvent.OnPasswordEntered -> handleRemoveProtectionPassword(event.password)
             PasswordPromptEvent.OnDismiss -> _passwordPromptState.update { PasswordPromptState() }
+        }
+    }
+
+    private fun loadInitialState() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val isAutoUpdateEnabled = settingsRepository.isAutoUpdateCheckEnabled()
+            val isToggleOnStart = settingsRepository.isToggleOnStart()
+            val useCheckbox = settingsRepository.useCheckbox()
+            val isContactEmailVisible = settingsRepository.isContactEmailVisible()
+            val areAllUpdatesDisabled = settingsRepository.areAllUpdatesDisabled()
+            val isNetGuardInstalled = isNetGuardInstalled()
+            val currentDeviceApi = Build.VERSION.SDK_INT
+
+            val categoryToggles = CategoryRegistry.allCategories.map { category ->
+                val featureToggles = category.features.map { feature ->
+                    var isSupported = currentDeviceApi >= feature.requiredSdkVersion
+                    var conflictReason: Int? = null
+
+                    if (feature.id == BlockInternetVpnFeature.id && isNetGuardInstalled) {
+                        isSupported = false
+                        conflictReason = R.string.conflict_reason_netguard_installed
+                    }
+
+                    FeatureToggle(
+                        feature = feature,
+                        isEnabled = settingsRepository.getFeatureState(feature.id),
+                        isSupported = isSupported,
+                        requiredApi = feature.requiredSdkVersion,
+                        conflictReasonResId = conflictReason
+                    )
+                }
+                CategoryToggle(titleResId = category.titleResId, toggles = featureToggles)
+            }
+            _uiState.update { it.copy(
+                categoryToggles = categoryToggles,
+                isLoading = false,
+                isAutoUpdateEnabled = isAutoUpdateEnabled,
+                isToggleOnStart = isToggleOnStart,
+                useCheckbox = useCheckbox,
+                isContactEmailVisible = isContactEmailVisible,
+                areAllUpdatesDisabled = areAllUpdatesDisabled
+            ) }
+        }
+    }
+
+    private fun saveChanges() {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+
+            // -- התיקון כאן: בדיקת המצב של NetGuard לפני השמירה --
+            val wasNetGuardProtectedBeforeSave = settingsRepository.getFeatureState(InstallAndProtectNetGuardFeature.id)
+            val isNetGuardProtectionBeingDisabled = wasNetGuardProtectedBeforeSave &&
+                    currentState.categoryToggles.flatMap { it.toggles }
+                        .find { it.feature.id == InstallAndProtectNetGuardFeature.id }?.isEnabled == false
+
+            // שמירת כל ההגדרות
+            currentState.categoryToggles.flatMap { it.toggles }.forEach { toggle ->
+                toggle.feature.applyPolicy(context, dpm, adminComponentName, toggle.isEnabled)
+                settingsRepository.setFeatureState(toggle.feature.id, toggle.isEnabled)
+            }
+            settingsRepository.setAutoUpdateCheckEnabled(currentState.isAutoUpdateEnabled)
+            settingsRepository.setToggleOnStart(currentState.isToggleOnStart)
+            settingsRepository.setUseCheckbox(currentState.useCheckbox)
+            settingsRepository.setContactEmailVisible(currentState.isContactEmailVisible)
+            settingsRepository.setAllUpdatesDisabled(currentState.areAllUpdatesDisabled)
+
+            var snackbarMessage = "ההגדרות נשמרו בהצלחה!"
+            if (isNetGuardProtectionBeingDisabled && isNetGuardInstalled()) {
+                snackbarMessage += "\n" + context.getString(R.string.toast_netguard_can_be_uninstalled)
+            }
+
+            _uiState.update { it.copy(snackbarMessage = snackbarMessage) }
+            loadInitialState()
+            _sideEffect.emit(SettingsSideEffect.NavigateBack)
+        }
+    }
+
+    private fun lockSettings(allowManualUpdate: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setAllUpdatesDisabled(true)
+            settingsRepository.setAutoUpdateCheckEnabled(false)
+            settingsRepository.lockSettingsPermanently(allowManualUpdate)
+            Log.d("SettingsVM", "SETTINGS PERMANENTLY LOCKED. Allow manual updates: $allowManualUpdate")
+            _sideEffect.emit(SettingsSideEffect.NavigateBack)
         }
     }
 
@@ -139,54 +221,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun loadInitialState() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-
-            val isAutoUpdateEnabled = settingsRepository.isAutoUpdateCheckEnabled()
-            val isNetGuardInstalled = isNetGuardInstalled()
-            val currentDeviceApi = Build.VERSION.SDK_INT
-
-            val categoryToggles = CategoryRegistry.allCategories.map { category ->
-                val featureToggles = category.features.map { feature ->
-                    var isSupported = currentDeviceApi >= feature.requiredSdkVersion
-                    var conflictReason: Int? = null
-
-                    if (feature.id == BlockInternetVpnFeature.id && isNetGuardInstalled) {
-                        isSupported = false
-                        conflictReason = R.string.conflict_reason_netguard_installed
-                    }
-
-                    FeatureToggle(
-                        feature = feature,
-                        isEnabled = settingsRepository.getFeatureState(feature.id),
-                        isSupported = isSupported,
-                        requiredApi = feature.requiredSdkVersion,
-                        conflictReasonResId = conflictReason
-                    )
-                }
-                CategoryToggle(titleResId = category.titleResId, toggles = featureToggles)
-            }
-            _uiState.update { it.copy(
-                categoryToggles = categoryToggles,
-                isLoading = false,
-                isAutoUpdateEnabled = isAutoUpdateEnabled
-            ) }
-        }
-    }
-
-    private fun saveChanges() {
-        viewModelScope.launch {
-            _uiState.value.categoryToggles.flatMap { it.toggles }.forEach { toggle ->
-                toggle.feature.applyPolicy(context, dpm, adminComponentName, toggle.isEnabled)
-                settingsRepository.setFeatureState(toggle.feature.id, toggle.isEnabled)
-            }
-            _uiState.update { it.copy(snackbarMessage = "ההגדרות נשמרו בהצלחה!") }
-            loadInitialState()
-            _sideEffect.emit(SettingsSideEffect.NavigateBack) // Trigger navigation back
-        }
-    }
-
     @Suppress("DEPRECATION")
     private fun initiateRemoval() {
         viewModelScope.launch {
@@ -231,7 +265,6 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-// Separate state and events for the password prompt for clarity
 data class PasswordPromptState(
     val isVisible: Boolean = false,
     val error: String? = null

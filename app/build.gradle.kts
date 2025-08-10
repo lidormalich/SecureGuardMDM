@@ -10,7 +10,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.abloq.mdm"
+        applicationId = "com.secureguard.mdm"
         minSdk = 22
         targetSdk = 34
         versionCode = 1

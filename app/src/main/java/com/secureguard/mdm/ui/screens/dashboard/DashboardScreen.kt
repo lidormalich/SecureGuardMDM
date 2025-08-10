@@ -46,7 +46,7 @@ fun DashboardScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadFeatureStatuses()
+                viewModel.loadInitialState()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -80,17 +80,17 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text(stringResource(id = R.string.dashboard_title)) },
                 actions = {
-                    // --- כפתור עדכון ידני ---
-                    IconButton(onClick = {
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "application/vnd.android.package-archive"
+                    if (uiState.isManualUpdateEnabled) {
+                        IconButton(onClick = {
+                            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "application/vnd.android.package-archive"
+                            }
+                            filePickerLauncher.launch(intent)
+                        }) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = stringResource(R.string.dashboard_button_update_app))
                         }
-                        filePickerLauncher.launch(intent)
-                    }) {
-                        Icon(Icons.Default.SystemUpdate, contentDescription = stringResource(R.string.dashboard_button_update_app))
                     }
-                    // --- כפתור מידע ---
                     IconButton(onClick = { showAppInfoDialog = true }) {
                         Icon(painterResource(id = R.drawable.ic_info), contentDescription = "אודות האפליקציה")
                     }
@@ -98,11 +98,13 @@ fun DashboardScreen(
             )
         },
         bottomBar = {
-            Button(
-                onClick = { viewModel.onEvent(DashboardEvent.OnSettingsClicked) },
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Text(stringResource(id = R.string.dashboard_button_settings))
+            if (uiState.isSettingsButtonVisible) {
+                Button(
+                    onClick = { viewModel.onEvent(DashboardEvent.OnSettingsClicked) },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text(stringResource(id = R.string.dashboard_button_settings))
+                }
             }
         }
     ) { paddingValues ->
@@ -138,7 +140,11 @@ fun DashboardScreen(
     }
 
     if (showAppInfoDialog) {
-        AppInfoDialog(onDismiss = { showAppInfoDialog = false })
+        AppInfoDialog(
+            isContactEmailVisible = uiState.isContactEmailVisible,
+            onCheckForUpdateClick = { viewModel.onEvent(DashboardEvent.OnManualUpdateCheck) },
+            onDismiss = { showAppInfoDialog = false }
+        )
     }
 
     if (uiState.updateDialogState != UpdateDialogState.HIDDEN) {

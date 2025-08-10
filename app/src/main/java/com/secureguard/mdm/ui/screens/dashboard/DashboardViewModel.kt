@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.mdm.R
 import com.secureguard.mdm.SecureGuardDeviceAdminReceiver
 import com.secureguard.mdm.data.repository.SettingsRepository
 import com.secureguard.mdm.features.api.ProtectionFeature
@@ -50,7 +51,11 @@ data class DashboardUiState(
     val updateDialogState: UpdateDialogState = UpdateDialogState.HIDDEN,
     val availableUpdateInfo: UpdateInfo? = null,
     val downloadProgress: Int = 0,
-    val updateError: String? = null
+    val updateError: String? = null,
+    // UI control based on settings
+    val isSettingsButtonVisible: Boolean = true,
+    val isContactEmailVisible: Boolean = true,
+    val isManualUpdateEnabled: Boolean = true
 )
 
 sealed class DashboardEvent {
@@ -58,6 +63,7 @@ sealed class DashboardEvent {
     data class OnPasswordEntered(val password: String) : DashboardEvent()
     object OnDismissPasswordPrompt : DashboardEvent()
     data class OnUpdateFileSelected(val uri: Uri?) : DashboardEvent()
+    object OnManualUpdateCheck : DashboardEvent() // <-- אירוע חדש
     // Update events
     object OnStartUpdateDownload : DashboardEvent()
     object OnDismissUpdateDialog : DashboardEvent()
@@ -86,21 +92,51 @@ class DashboardViewModel @Inject constructor(
     val sideEffect = _sideEffect.asSharedFlow()
 
     init {
-        loadFeatureStatuses()
-        checkForUpdates()
+        loadInitialState()
     }
 
-    private fun checkForUpdates() {
+    fun loadInitialState() {
         viewModelScope.launch {
-            if (settingsRepository.isAutoUpdateCheckEnabled()) {
+            _uiState.update { it.copy(isLoading = true) }
+
+            val settingsLocked = settingsRepository.isSettingsLocked()
+            val allUpdatesDisabled = settingsRepository.areAllUpdatesDisabled()
+            val allowManualWhenLocked = settingsRepository.allowManualUpdateWhenLocked()
+            val contactEmailVisible = settingsRepository.isContactEmailVisible()
+
+            _uiState.update {
+                it.copy(
+                    isSettingsButtonVisible = !settingsLocked,
+                    isManualUpdateEnabled = !allUpdatesDisabled || (settingsLocked && allowManualWhenLocked),
+                    isContactEmailVisible = contactEmailVisible
+                )
+            }
+
+            loadFeatureStatuses()
+
+            if (!allUpdatesDisabled) {
+                checkForUpdates(isAutoCheck = true)
+            }
+        }
+    }
+
+    private fun checkForUpdates(isAutoCheck: Boolean) {
+        viewModelScope.launch {
+            if (!isAutoCheck || settingsRepository.isAutoUpdateCheckEnabled()) {
+                if (!isAutoCheck) {
+                    _sideEffect.emit(DashboardSideEffect.ToastMessage(context.getString(R.string.update_check_checking)))
+                }
                 when (val result = updateManager.checkForUpdate()) {
                     is UpdateResult.UpdateAvailable -> {
                         _uiState.update { it.copy(availableUpdateInfo = result.info, updateDialogState = UpdateDialogState.SHOW_INFO) }
                     }
                     is UpdateResult.Failure -> {
                         Log.e("DashboardVM", "Update check failed: ${result.message}")
+                        if (!isAutoCheck) _sideEffect.emit(DashboardSideEffect.ToastMessage(result.message))
                     }
-                    is UpdateResult.NoUpdate -> { /* Do nothing */ }
+                    is UpdateResult.NoUpdate -> {
+                        if (!isAutoCheck) _sideEffect.emit(DashboardSideEffect.ToastMessage(context.getString(R.string.update_check_no_update)))
+                    }
                 }
             }
         }
@@ -108,12 +144,19 @@ class DashboardViewModel @Inject constructor(
 
     fun onEvent(event: DashboardEvent) {
         when (event) {
-            is DashboardEvent.OnSettingsClicked -> _uiState.update { it.copy(isPasswordPromptVisible = true, passwordError = null) }
+            is DashboardEvent.OnSettingsClicked -> {
+                if (!_uiState.value.isSettingsButtonVisible) return
+                _uiState.update { it.copy(isPasswordPromptVisible = true, passwordError = null) }
+            }
             is DashboardEvent.OnDismissPasswordPrompt -> _uiState.update { it.copy(isPasswordPromptVisible = false) }
             is DashboardEvent.OnPasswordEntered -> verifyPasswordAndNavigate(event.password)
-            is DashboardEvent.OnUpdateFileSelected -> event.uri?.let { handleSecureUpdate(it) }
+            is DashboardEvent.OnUpdateFileSelected -> {
+                if (!_uiState.value.isManualUpdateEnabled) return
+                event.uri?.let { handleSecureUpdate(it) }
+            }
             is DashboardEvent.OnStartUpdateDownload -> startUpdateDownload()
             is DashboardEvent.OnDismissUpdateDialog -> _uiState.update { it.copy(updateDialogState = UpdateDialogState.HIDDEN) }
+            is DashboardEvent.OnManualUpdateCheck -> checkForUpdates(isAutoCheck = false)
         }
     }
 
@@ -136,7 +179,6 @@ class DashboardViewModel @Inject constructor(
                 }
         }
     }
-
 
     private fun handleSecureUpdate(uri: Uri) {
         viewModelScope.launch {
@@ -184,9 +226,8 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun loadFeatureStatuses() {
+    private fun loadFeatureStatuses() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
             val adminComponent = SecureGuardDeviceAdminReceiver.getComponentName(context)
             val allStatuses = FeatureRegistry.allFeatures.map { feature ->
                 val isActive = feature.isPolicyActive(context, dpm, adminComponent)

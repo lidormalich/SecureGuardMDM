@@ -12,8 +12,22 @@ interface SettingsRepository {
     suspend fun setSetupComplete(isComplete: Boolean)
     suspend fun getOriginalDialerPackage(): String?
     suspend fun setOriginalDialerPackage(packageName: String?)
-    suspend fun isAutoUpdateCheckEnabled(): Boolean // <-- פונקציה חדשה
-    suspend fun setAutoUpdateCheckEnabled(isEnabled: Boolean) // <-- פונקציה חדשה
+    suspend fun isAutoUpdateCheckEnabled(): Boolean
+    suspend fun setAutoUpdateCheckEnabled(isEnabled: Boolean)
+
+    // --- הגדרות חדשות ---
+    suspend fun isToggleOnStart(): Boolean
+    suspend fun setToggleOnStart(isOnStart: Boolean)
+    suspend fun useCheckbox(): Boolean
+    suspend fun setUseCheckbox(useCheckbox: Boolean)
+    suspend fun isContactEmailVisible(): Boolean
+    suspend fun setContactEmailVisible(isVisible: Boolean)
+    suspend fun areAllUpdatesDisabled(): Boolean
+    suspend fun setAllUpdatesDisabled(isDisabled: Boolean)
+    suspend fun isSettingsLocked(): Boolean
+    suspend fun lockSettingsPermanently(allowManualUpdate: Boolean) // <-- שינוי חתימה
+    suspend fun allowManualUpdateWhenLocked(): Boolean // <-- פונקציה חדשה
+
 
     // --- פעולות FRP ---
     suspend fun getCustomFrpIds(): Set<String>

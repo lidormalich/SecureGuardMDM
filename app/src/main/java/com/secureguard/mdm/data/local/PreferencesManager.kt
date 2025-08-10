@@ -20,6 +20,14 @@ class PreferencesManager @Inject constructor(private val prefs: SharedPreference
         const val KEY_BLOCKED_APP_PACKAGES = "blocked_app_packages"
         const val KEY_ORIGINAL_DIALER_PACKAGE = "original_dialer_package"
         const val KEY_CUSTOM_FRP_IDS = "custom_frp_ids"
-        const val KEY_AUTO_UPDATE_CHECK_ENABLED = "auto_update_check_enabled" // <-- מפתח חדש
+        const val KEY_AUTO_UPDATE_CHECK_ENABLED = "auto_update_check_enabled"
+
+        // --- מפתחות להתאמה אישית ונעילה ---
+        const val KEY_UI_PREF_TOGGLE_ON_START = "ui_pref_toggle_on_start"
+        const val KEY_UI_PREF_USE_CHECKBOX = "ui_pref_use_checkbox"
+        const val KEY_UI_PREF_SHOW_CONTACT_EMAIL = "ui_pref_show_contact_email"
+        const val KEY_UPDATE_PREF_DISABLE_ALL_UPDATES = "update_pref_disable_all_updates"
+        const val KEY_SETTINGS_LOCKED_PERMANENTLY = "settings_locked_permanently"
+        const val KEY_ALLOW_MANUAL_UPDATE_WHEN_LOCKED = "allow_manual_update_when_locked" // <-- מפתח חדש
     }
 }

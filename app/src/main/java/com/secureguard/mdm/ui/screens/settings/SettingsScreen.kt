@@ -48,8 +48,9 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showUnsupportedDialogFor by remember { mutableStateOf<FeatureToggle?>(null) }
     var showRemoveConfirmationDialog by remember { mutableStateOf(false) }
+    var showLockConfirmationDialog by remember { mutableStateOf(false) }
     var showInfoDialogFor by remember { mutableStateOf<FeatureToggle?>(null) }
-    var showFrpWarningDialog by remember { mutableStateOf(false) } // State for FRP warning
+    var showFrpWarningDialog by remember { mutableStateOf(false) }
 
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -110,79 +111,81 @@ fun SettingsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
             ) {
+                item {
+                    Text(
+                        text = stringResource(id = R.string.category_ui_and_behavior),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                    )
+                }
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsToggleItem(
+                            title = stringResource(id = R.string.settings_item_toggle_position),
+                            isChecked = uiState.isToggleOnStart,
+                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnTogglePositionChanged(it)) }
+                        )
+                        SettingsToggleItem(
+                            title = stringResource(id = R.string.settings_item_use_checkbox),
+                            isChecked = uiState.useCheckbox,
+                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnControlTypeChanged(it)) }
+                        )
+                        SettingsToggleItem(
+                            title = stringResource(id = R.string.settings_item_show_contact_email),
+                            isChecked = uiState.isContactEmailVisible,
+                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnContactEmailVisibilityChanged(it)) }
+                        )
+                    }
+                }
+
                 uiState.categoryToggles.forEach { category ->
                     item {
                         Text(
                             text = stringResource(id = category.titleResId),
                             style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
                         )
                     }
                     items(items = category.toggles, key = { it.feature.id }) { toggle ->
-                        FeatureToggleRow(
-                            toggle = toggle,
-                            onToggle = { isEnabled ->
-                                if (toggle.feature.id == FrpProtectionFeature.id && isEnabled) {
-                                    showFrpWarningDialog = true
-                                } else {
-                                    viewModel.onEvent(SettingsEvent.OnToggleFeature(toggle.feature.id, isEnabled))
-                                }
-                            },
-                            onInfoClick = { showInfoDialogFor = toggle },
-                            onRowClick = { if (!toggle.isSupported) showUnsupportedDialogFor = toggle }
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.padding(horizontal = 16.dp)) {
+                            FeatureToggleRow(
+                                toggle = toggle,
+                                useCheckbox = uiState.useCheckbox,
+                                isControlOnStart = uiState.isToggleOnStart,
+                                onToggle = { isEnabled ->
+                                    if (toggle.feature.id == FrpProtectionFeature.id && isEnabled) {
+                                        showFrpWarningDialog = true
+                                    } else {
+                                        viewModel.onEvent(SettingsEvent.OnToggleFeature(toggle.feature.id, isEnabled))
+                                    }
+                                },
+                                onInfoClick = { showInfoDialogFor = toggle },
+                                onRowClick = { if (!toggle.isSupported) showUnsupportedDialogFor = toggle }
+                            )
+                        }
                     }
                 }
 
                 item {
-                    Text("ניהול אפליקציות וטלפון", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+                    Text(
+                        "פעולות מתקדמות",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp))
                 }
                 item {
-                    SettingsActionItem(stringResource(id = R.string.settings_item_select_apps_to_block), R.drawable.ic_manage_apps, onNavigateToAppSelection)
-                }
-                item {
-                    SettingsActionItem(stringResource(id = R.string.settings_item_view_blocked_apps), R.drawable.ic_apps_blocked, onNavigateToBlockedAppsDisplay)
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    item {
-                        SettingsActionItem(
-                            title = stringResource(R.string.settings_item_change_default_dialer),
-                            iconRes = R.drawable.ic_dialpad,
-                            onClick = {
-                                val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            }
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsActionItem("הגדר FRP מותאם אישית", R.drawable.ic_frp_shield, onNavigateToFrpSettings)
+                        SettingsActionItem(stringResource(id = R.string.settings_item_change_password), R.drawable.ic_key, onNavigateToChangePassword)
+                        SettingsToggleItem(
+                            title = stringResource(id = R.string.settings_item_disable_all_updates),
+                            isChecked = uiState.areAllUpdatesDisabled,
+                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnDisableAllUpdatesChanged(it)) }
                         )
+                        SettingsActionItem(stringResource(id = R.string.settings_item_lock_settings), R.drawable.ic_remove_protection, onClick = { showLockConfirmationDialog = true }, isDestructive = true)
+                        SettingsActionItem(stringResource(id = R.string.settings_item_remove_protection), R.drawable.ic_uninstall_off, onClick = { showRemoveConfirmationDialog = true }, isDestructive = true)
                     }
-                }
-
-                item {
-                    Text("פעולות נוספות", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-                }
-                item {
-                    SettingsToggleItem(
-                        title = stringResource(id = R.string.settings_item_auto_update_check),
-                        iconRes = R.drawable.ic_system_update,
-                        isChecked = uiState.isAutoUpdateEnabled,
-                        onCheckedChange = { isEnabled -> viewModel.onEvent(SettingsEvent.OnAutoUpdateToggled(isEnabled)) }
-                    )
-                }
-                item {
-                    SettingsActionItem(
-                        title = "הגדר FRP מותאם אישית",
-                        iconRes = R.drawable.ic_frp_shield,
-                        onClick = onNavigateToFrpSettings
-                    )
-                }
-                item {
-                    SettingsActionItem(stringResource(id = R.string.settings_item_change_password), R.drawable.ic_key, onNavigateToChangePassword)
-                }
-                item {
-                    SettingsActionItem(title = stringResource(id = R.string.settings_item_remove_protection), iconRes = R.drawable.ic_remove_protection, onClick = { showRemoveConfirmationDialog = true }, isDestructive = true)
                 }
             }
         }
@@ -209,8 +212,17 @@ fun SettingsScreen(
         )
     }
 
+    if (showLockConfirmationDialog) {
+        LockSettingsConfirmationDialog(
+            onDismiss = { showLockConfirmationDialog = false },
+            onConfirm = { allowManualUpdate ->
+                showLockConfirmationDialog = false
+                viewModel.onEvent(SettingsEvent.OnLockSettingsConfirmed(allowManualUpdate))
+            }
+        )
+    }
+
     showUnsupportedDialogFor?.let { toggle ->
-        val context = LocalContext.current
         InfoDialog(
             title = stringResource(id = R.string.dialog_title_unsupported_feature),
             message = context.getString(R.string.dialog_description_unsupported_feature, context.getString(toggle.feature.titleRes), toggle.requiredApi, getAndroidVersionName(toggle.requiredApi), Build.VERSION.SDK_INT, Build.VERSION.RELEASE),
@@ -219,10 +231,9 @@ fun SettingsScreen(
     }
 
     showInfoDialogFor?.let { toggle ->
-        val feature: ProtectionFeature = toggle.feature
         InfoDialog(
-            title = stringResource(id = feature.titleRes),
-            message = stringResource(id = feature.descriptionRes),
+            title = stringResource(id = toggle.feature.titleRes),
+            message = stringResource(id = toggle.feature.descriptionRes),
             onDismiss = { showInfoDialogFor = null }
         )
     }
@@ -242,17 +253,87 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun LockSettingsConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Boolean) -> Unit
+) {
+    var allowManualUpdate by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(id = R.string.settings_lock_dialog_title)) },
+        text = {
+            Column {
+                Text(stringResource(id = R.string.settings_lock_dialog_message))
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { allowManualUpdate = !allowManualUpdate }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = allowManualUpdate,
+                        onCheckedChange = { allowManualUpdate = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(id = R.string.settings_lock_dialog_allow_manual_update))
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(allowManualUpdate) },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text(stringResource(id = R.string.dialog_button_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(id = R.string.dialog_button_cancel))
+            }
+        }
+    )
+}
+
+@Composable
 private fun FeatureToggleRow(
     toggle: FeatureToggle,
+    useCheckbox: Boolean,
+    isControlOnStart: Boolean,
     onToggle: (Boolean) -> Unit,
     onInfoClick: () -> Unit,
     onRowClick: () -> Unit
 ) {
     val tint = if (toggle.isSupported) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
 
+    @Composable
+    fun Control() {
+        if (useCheckbox) {
+            Checkbox(
+                checked = toggle.isEnabled,
+                onCheckedChange = onToggle,
+                enabled = toggle.isSupported
+            )
+        } else {
+            Switch(
+                checked = toggle.isEnabled,
+                onCheckedChange = onToggle,
+                enabled = toggle.isSupported
+            )
+        }
+    }
+
     Card(modifier = Modifier.fillMaxWidth().clickable(enabled = !toggle.isSupported, onClick = onRowClick)) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isControlOnStart) {
+                    Control()
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+
                 Icon(
                     painter = painterResource(id = toggle.feature.iconRes),
                     contentDescription = null,
@@ -263,21 +344,11 @@ private fun FeatureToggleRow(
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(id = toggle.feature.titleRes),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = tint
-                        )
-                        if (toggle.feature.id == FrpProtectionFeature.id) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = stringResource(id = R.string.feature_frp_protection_experimental_tag),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
+                    Text(
+                        text = stringResource(id = toggle.feature.titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = tint
+                    )
                 }
 
                 IconButton(onClick = onInfoClick, enabled = toggle.isSupported) {
@@ -288,11 +359,10 @@ private fun FeatureToggleRow(
                     )
                 }
 
-                Switch(
-                    checked = toggle.isEnabled,
-                    onCheckedChange = onToggle,
-                    enabled = toggle.isSupported
-                )
+                if (!isControlOnStart) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Control()
+                }
             }
             toggle.conflictReasonResId?.let { reasonResId ->
                 Text(
@@ -323,14 +393,16 @@ fun SettingsActionItem(title: String, iconRes: Int, onClick: () -> Unit, isDestr
 }
 
 @Composable
-fun SettingsToggleItem(title: String, iconRes: Int, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun SettingsToggleItem(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit, iconRes: Int? = null) {
     Card(modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!isChecked) }) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(16.dp))
+            iconRes?.let {
+                Icon(painter = painterResource(id = it), contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+            }
             Text(text = title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Switch(checked = isChecked, onCheckedChange = onCheckedChange)
         }
@@ -339,19 +411,6 @@ fun SettingsToggleItem(title: String, iconRes: Int, isChecked: Boolean, onChecke
 
 private fun getAndroidVersionName(sdkInt: Int): String {
     return when (sdkInt) {
-        Build.VERSION_CODES.LOLLIPOP_MR1 -> "5.1"
-        Build.VERSION_CODES.M -> "6.0"
-        Build.VERSION_CODES.N -> "7.0"
-        Build.VERSION_CODES.N_MR1 -> "7.1"
-        Build.VERSION_CODES.O -> "8.0"
-        Build.VERSION_CODES.O_MR1 -> "8.1"
-        Build.VERSION_CODES.P -> "9"
-        Build.VERSION_CODES.Q -> "10"
-        Build.VERSION_CODES.R -> "11"
-        Build.VERSION_CODES.S -> "12"
-        Build.VERSION_CODES.S_V2 -> "12L"
-        Build.VERSION_CODES.TIRAMISU -> "13"
-        34 -> "14"
-        else -> sdkInt.toString()
+        Build.VERSION_CODES.LOLLIPOP_MR1 -> "5.1"; Build.VERSION_CODES.M -> "6.0"; Build.VERSION_CODES.N -> "7.0"; Build.VERSION_CODES.N_MR1 -> "7.1"; Build.VERSION_CODES.O -> "8.0"; Build.VERSION_CODES.O_MR1 -> "8.1"; Build.VERSION_CODES.P -> "9"; Build.VERSION_CODES.Q -> "10"; Build.VERSION_CODES.R -> "11"; Build.VERSION_CODES.S -> "12"; Build.VERSION_CODES.S_V2 -> "12L"; Build.VERSION_CODES.TIRAMISU -> "13"; 34 -> "14"; else -> sdkInt.toString()
     }
 }

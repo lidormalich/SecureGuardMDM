@@ -47,12 +47,60 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun isAutoUpdateCheckEnabled(): Boolean = withContext(Dispatchers.IO) {
-        preferencesManager.loadBoolean(PreferencesManager.KEY_AUTO_UPDATE_CHECK_ENABLED, true) // Default is true
+        preferencesManager.loadBoolean(PreferencesManager.KEY_AUTO_UPDATE_CHECK_ENABLED, true)
     }
 
     override suspend fun setAutoUpdateCheckEnabled(isEnabled: Boolean) = withContext(Dispatchers.IO) {
         preferencesManager.saveBoolean(PreferencesManager.KEY_AUTO_UPDATE_CHECK_ENABLED, isEnabled)
     }
+
+    // --- מימוש פונקציות חדשות ---
+
+    override suspend fun isToggleOnStart(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_UI_PREF_TOGGLE_ON_START, false)
+    }
+
+    override suspend fun setToggleOnStart(isOnStart: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_UI_PREF_TOGGLE_ON_START, isOnStart)
+    }
+
+    override suspend fun useCheckbox(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_UI_PREF_USE_CHECKBOX, false)
+    }
+
+    override suspend fun setUseCheckbox(useCheckbox: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_UI_PREF_USE_CHECKBOX, useCheckbox)
+    }
+
+    override suspend fun isContactEmailVisible(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_UI_PREF_SHOW_CONTACT_EMAIL, true)
+    }
+
+    override suspend fun setContactEmailVisible(isVisible: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_UI_PREF_SHOW_CONTACT_EMAIL, isVisible)
+    }
+
+    override suspend fun areAllUpdatesDisabled(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_UPDATE_PREF_DISABLE_ALL_UPDATES, false)
+    }
+
+    override suspend fun setAllUpdatesDisabled(isDisabled: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_UPDATE_PREF_DISABLE_ALL_UPDATES, isDisabled)
+    }
+
+    override suspend fun isSettingsLocked(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_SETTINGS_LOCKED_PERMANENTLY, false)
+    }
+
+    override suspend fun lockSettingsPermanently(allowManualUpdate: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_SETTINGS_LOCKED_PERMANENTLY, true)
+        preferencesManager.saveBoolean(PreferencesManager.KEY_ALLOW_MANUAL_UPDATE_WHEN_LOCKED, allowManualUpdate)
+    }
+
+    override suspend fun allowManualUpdateWhenLocked(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_ALLOW_MANUAL_UPDATE_WHEN_LOCKED, false)
+    }
+
 
     // --- מימוש פונקציות FRP ---
     override suspend fun getCustomFrpIds(): Set<String> = withContext(Dispatchers.IO) {

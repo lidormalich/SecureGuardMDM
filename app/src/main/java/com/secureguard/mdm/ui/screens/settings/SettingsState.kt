@@ -19,7 +19,13 @@ data class SettingsUiState(
     val categoryToggles: List<CategoryToggle> = emptyList(),
     val isLoading: Boolean = true,
     val snackbarMessage: String? = null,
-    val isAutoUpdateEnabled: Boolean = true // <-- מצב חדש
+    val isAutoUpdateEnabled: Boolean = true,
+
+    // --- מצבים חדשים להתאמה אישית ונעילה ---
+    val isToggleOnStart: Boolean = false,
+    val useCheckbox: Boolean = false,
+    val isContactEmailVisible: Boolean = true,
+    val areAllUpdatesDisabled: Boolean = false
 )
 
 sealed class SettingsEvent {
@@ -28,5 +34,12 @@ sealed class SettingsEvent {
     object OnSnackbarShown : SettingsEvent()
     object OnRemoveProtectionRequest : SettingsEvent()
     data class OnVpnPermissionResult(val granted: Boolean) : SettingsEvent()
-    data class OnAutoUpdateToggled(val isEnabled: Boolean) : SettingsEvent() // <-- אירוע חדש
+    data class OnAutoUpdateToggled(val isEnabled: Boolean) : SettingsEvent()
+
+    // --- אירועים חדשים ---
+    data class OnTogglePositionChanged(val isStart: Boolean) : SettingsEvent()
+    data class OnControlTypeChanged(val useCheckbox: Boolean) : SettingsEvent()
+    data class OnContactEmailVisibilityChanged(val isVisible: Boolean) : SettingsEvent()
+    data class OnDisableAllUpdatesChanged(val isDisabled: Boolean) : SettingsEvent()
+    data class OnLockSettingsConfirmed(val allowManualUpdate: Boolean) : SettingsEvent() // <-- שינוי כאן
 }
