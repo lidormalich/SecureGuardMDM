@@ -115,9 +115,23 @@ fun SettingsScreen(
             ) {
                 item {
                     Text(
-                        text = stringResource(id = R.string.category_ui_and_behavior),
+                        text = "ניהול אפליקציות וחסימות",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                    )
+                }
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsActionItem(stringResource(id = R.string.settings_item_select_apps_to_block), R.drawable.ic_manage_apps, onNavigateToAppSelection)
+                        SettingsActionItem(stringResource(id = R.string.settings_item_view_blocked_apps), R.drawable.ic_apps_blocked, onNavigateToBlockedAppsDisplay)
+                    }
+                }
+
+                item {
+                    Text(
+                        text = stringResource(id = R.string.category_ui_and_behavior),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
                     )
                 }
                 item {
@@ -149,7 +163,7 @@ fun SettingsScreen(
                         )
                     }
                     items(items = category.toggles, key = { it.feature.id }) { toggle ->
-                        Box(Modifier.padding(horizontal = 16.dp)) {
+                        Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                             FeatureToggleRow(
                                 toggle = toggle,
                                 useCheckbox = uiState.useCheckbox,

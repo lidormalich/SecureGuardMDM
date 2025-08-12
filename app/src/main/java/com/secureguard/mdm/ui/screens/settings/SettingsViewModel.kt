@@ -133,14 +133,11 @@ class SettingsViewModel @Inject constructor(
     private fun saveChanges() {
         viewModelScope.launch {
             val currentState = _uiState.value
-
-            // -- התיקון כאן: בדיקת המצב של NetGuard לפני השמירה --
             val wasNetGuardProtectedBeforeSave = settingsRepository.getFeatureState(InstallAndProtectNetGuardFeature.id)
             val isNetGuardProtectionBeingDisabled = wasNetGuardProtectedBeforeSave &&
                     currentState.categoryToggles.flatMap { it.toggles }
                         .find { it.feature.id == InstallAndProtectNetGuardFeature.id }?.isEnabled == false
 
-            // שמירת כל ההגדרות
             currentState.categoryToggles.flatMap { it.toggles }.forEach { toggle ->
                 toggle.feature.applyPolicy(context, dpm, adminComponentName, toggle.isEnabled)
                 settingsRepository.setFeatureState(toggle.feature.id, toggle.isEnabled)
