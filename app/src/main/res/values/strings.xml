@@ -232,7 +232,7 @@
     <string name="settings_item_enable_updates">אפשר עדכונים לאפליקציה</string>
     <!-- Settings Screen - New Category -->
     <string name="category_ui_and_behavior">התאמה אישית והתנהגות</string>
-    <string name="settings_item_toggle_position">הצג פקדים בצד שמאל</string>
+    <string name="settings_item_toggle_position">הצג פקדים בצד ימין</string>
     <string name="settings_item_use_checkbox">השתמש בתיבות סימון (במקום מתגים)</string>
     <string name="settings_item_show_contact_email">הצג אפשרות יצירת קשר במייל</string>
     <string name="settings_item_disable_all_updates">השבת את כל העדכונים (כולל ידני)</string>
