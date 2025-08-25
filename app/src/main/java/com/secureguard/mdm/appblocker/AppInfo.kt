@@ -15,7 +15,8 @@ import android.graphics.drawable.Drawable
 data class AppInfo(
     val appName: String,
     val packageName: String,
-    val icon: Drawable,
+    // --- התיקון כאן: הוספת @Transient כדי למנוע מ-Gson לנסות לסרוק את האובייקט המורכב הזה ---
+    @Transient val icon: Drawable,
     val isBlocked: Boolean,
     val isSystemApp: Boolean,
     val isLauncherApp: Boolean,

@@ -6,10 +6,20 @@
     <uses-permission android:name="android.permission.BIND_VPN_SERVICE"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"
-        tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Permissions that only exist on newer APIs will be ignored on older ones -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" tools:targetApi="O"/>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:targetApi="R"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:targetApi="P"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="TIRAMISU"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:targetApi="UPSIDE_DOWN_CAKE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- הוספת ההרשאה החסרה לשינוי הגדרות מערכת (כמו סיבוב מסך) -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false"/>
+
 
     <application
         android:name=".SecureGuardApplication"
@@ -21,19 +31,37 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SecureGuard"
-        tools:targetApi="31">
+        android:directBootAware="true"
+        tools:targetApi="34">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.SecureGuard"
             android:windowSoftInputMode="adjustResize"
-            android:excludeFromRecents="true"> <!-- - השינוי כאן -->
+            android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".kiosk.ui.KioskActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SecureGuard.Kiosk"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="true">
+            <!-- This intent filter declares KioskActivity as a potential Home screen -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.HOME"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity>
+
 
         <receiver
             android:name=".SecureGuardDeviceAdminReceiver"
@@ -47,6 +75,20 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+
+        <!-- Receiver is now disabled by default and enabled programmatically on setup -->
+        <receiver
+            android:name=".boot.BootCompletedReceiver"
+            android:directBootAware="true"
+            android:enabled="false"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
 
         <receiver
             android:name=".receivers.InstallReceiver"
@@ -69,6 +111,12 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".MainService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="UPSIDE_DOWN_CAKE" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

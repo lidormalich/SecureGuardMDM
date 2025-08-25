@@ -44,6 +44,7 @@ object BlockIncomingCallsFeature : ProtectionFeature {
     }
 
     override fun applyPolicy(context: Context, dpm: DevicePolicyManager, admin: ComponentName, enable: Boolean) {
+        // FIX: Added version guard to prevent crash on API < 23
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             Log.w(TAG, "Cannot apply policy, API level ${Build.VERSION.SDK_INT} is below required ${Build.VERSION_CODES.M}")
             return
@@ -60,6 +61,8 @@ object BlockIncomingCallsFeature : ProtectionFeature {
     }
 
     override fun isPolicyActive(context: Context, dpm: DevicePolicyManager, admin: ComponentName): Boolean {
+        // FIX: Add version guard, as PackageManager calls might behave differently on older APIs.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
         return try {
             context.packageManager.getPackageInfo(NO_PHONE_PACKAGE_NAME, 0)
             true
@@ -99,19 +102,16 @@ object BlockIncomingCallsFeature : ProtectionFeature {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun disableBlocking(context: Context, dpm: DevicePolicyManager, admin: ComponentName, repo: SettingsRepository) {
         CoroutineScope(Dispatchers.IO).launch {
-            // --- התיקון המרכזי כאן! ---
-            // 1. קרא את הערך השמור
             val originalDialer = repo.getOriginalDialerPackage()
 
-            // 2. אם הערך ריק, זה אומר שאין מה לשחזר, אז צא מהפונקציה
             if (originalDialer == null) {
                 Log.d(TAG, "disableBlocking called but no original dialer is saved. Doing nothing.")
                 return@launch
             }
 
-            // 3. אם אנחנו כאן, זה אומר שהיה ערך שמור, ולכן צריך לפעול
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, R.string.toast_restoring_dialer, Toast.LENGTH_SHORT).show()
             }
@@ -120,7 +120,6 @@ object BlockIncomingCallsFeature : ProtectionFeature {
             try {
                 dpm.setApplicationHidden(admin, originalDialer, false)
                 Log.d(TAG, "Successfully un-hid original dialer: $originalDialer")
-                // נקה את הערך השמור רק לאחר שחזור מוצלח
                 repo.setOriginalDialerPackage(null)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to un-hide original dialer", e)
@@ -128,6 +127,7 @@ object BlockIncomingCallsFeature : ProtectionFeature {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun installNoPhoneApp(context: Context) {
         CoroutineScope(Dispatchers.Main).launch {
             Toast.makeText(context, R.string.toast_installing_nophone, Toast.LENGTH_SHORT).show()

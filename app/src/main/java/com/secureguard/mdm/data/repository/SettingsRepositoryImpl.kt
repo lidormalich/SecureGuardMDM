@@ -54,8 +54,6 @@ class SettingsRepositoryImpl @Inject constructor(
         preferencesManager.saveBoolean(PreferencesManager.KEY_AUTO_UPDATE_CHECK_ENABLED, isEnabled)
     }
 
-    // --- מימוש פונקציות חדשות ---
-
     override suspend fun isToggleOnStart(): Boolean = withContext(Dispatchers.IO) {
         preferencesManager.loadBoolean(PreferencesManager.KEY_UI_PREF_TOGGLE_ON_START, false)
     }
@@ -101,8 +99,15 @@ class SettingsRepositoryImpl @Inject constructor(
         preferencesManager.loadBoolean(PreferencesManager.KEY_ALLOW_MANUAL_UPDATE_WHEN_LOCKED, false)
     }
 
+    override suspend fun isShowBootToastEnabled(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_SHOW_BOOT_TOAST, true) // Default to true
+    }
 
-    // --- מימוש פונקציות FRP ---
+    override suspend fun setShowBootToastEnabled(isEnabled: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_SHOW_BOOT_TOAST, isEnabled)
+    }
+
+
     override suspend fun getCustomFrpIds(): Set<String> = withContext(Dispatchers.IO) {
         preferencesManager.loadStringSet(PreferencesManager.KEY_CUSTOM_FRP_IDS, emptySet())
     }
@@ -111,8 +116,6 @@ class SettingsRepositoryImpl @Inject constructor(
         preferencesManager.saveStringSet(PreferencesManager.KEY_CUSTOM_FRP_IDS, ids)
     }
 
-    // --- מימוש פונקציות חסימת אפליקציות ---
-
     override suspend fun getBlockedAppPackages(): Set<String> = withContext(Dispatchers.IO) {
         preferencesManager.loadStringSet(PreferencesManager.KEY_BLOCKED_APP_PACKAGES, emptySet())
     }
@@ -120,8 +123,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setBlockedAppPackages(packageNames: Set<String>) = withContext(Dispatchers.IO) {
         preferencesManager.saveStringSet(PreferencesManager.KEY_BLOCKED_APP_PACKAGES, packageNames)
     }
-
-    // --- מימוש פונקציות המטמון (Room) ---
 
     override suspend fun getBlockedAppsCache(): List<BlockedAppCache> = withContext(Dispatchers.IO) {
         blockedAppCacheDao.getAll()
@@ -135,5 +136,88 @@ class SettingsRepositoryImpl @Inject constructor(
         if (packageNames.isNotEmpty()) {
             blockedAppCacheDao.deleteByPackageNames(packageNames)
         }
+    }
+
+    override suspend fun isKioskModeEnabled(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_KIOSK_MODE_ENABLED, false)
+    }
+
+    override suspend fun setKioskModeEnabled(isEnabled: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_KIOSK_MODE_ENABLED, isEnabled)
+    }
+
+    override suspend fun getKioskAppPackages(): Set<String> = withContext(Dispatchers.IO) {
+        preferencesManager.loadStringSet(PreferencesManager.KEY_KIOSK_APP_PACKAGES, emptySet())
+    }
+
+    override suspend fun setKioskAppPackages(packageNames: Set<String>) = withContext(Dispatchers.IO) {
+        preferencesManager.saveStringSet(PreferencesManager.KEY_KIOSK_APP_PACKAGES, packageNames)
+    }
+
+    override suspend fun getKioskBlockedLauncherPackage(): String? = withContext(Dispatchers.IO) {
+        preferencesManager.loadString(PreferencesManager.KEY_KIOSK_BLOCKED_LAUNCHER_PKG, null)
+    }
+
+    override suspend fun setKioskBlockedLauncherPackage(packageName: String?) = withContext(Dispatchers.IO) {
+        preferencesManager.saveString(PreferencesManager.KEY_KIOSK_BLOCKED_LAUNCHER_PKG, packageName)
+    }
+
+    override suspend fun getKioskTitle(): String = withContext(Dispatchers.IO) {
+        preferencesManager.loadString(PreferencesManager.KEY_KIOSK_TITLE_TEXT, "Kiosk Mode") ?: "Kiosk Mode"
+    }
+
+    override suspend fun setKioskTitle(title: String) = withContext(Dispatchers.IO) {
+        preferencesManager.saveString(PreferencesManager.KEY_KIOSK_TITLE_TEXT, title)
+    }
+
+    override suspend fun getKioskBackgroundColor(): Int = withContext(Dispatchers.IO) {
+        preferencesManager.loadInt(PreferencesManager.KEY_KIOSK_BACKGROUND_COLOR, 0xFF212121.toInt())
+    }
+
+    override suspend fun setKioskBackgroundColor(color: Int) = withContext(Dispatchers.IO) {
+        preferencesManager.saveInt(PreferencesManager.KEY_KIOSK_BACKGROUND_COLOR, color)
+    }
+
+    // --- הוספה: מימוש הפונקציות לניהול הצבע הראשי של הקיוסק ---
+    override suspend fun getKioskPrimaryColor(): Int = withContext(Dispatchers.IO) {
+        preferencesManager.loadInt(PreferencesManager.KEY_KIOSK_PRIMARY_COLOR, 0xFF6200EE.toInt()) // ברירת מחדל: כחול של Material
+    }
+
+    override suspend fun setKioskPrimaryColor(color: Int) = withContext(Dispatchers.IO) {
+        preferencesManager.saveInt(PreferencesManager.KEY_KIOSK_PRIMARY_COLOR, color)
+    }
+    // -------------------------------------------------------------
+
+    override suspend fun shouldShowKioskSecureUpdate(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_KIOSK_SHOW_SECURE_UPDATE, true)
+    }
+
+    override suspend fun setShouldShowKioskSecureUpdate(shouldShow: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_KIOSK_SHOW_SECURE_UPDATE, shouldShow)
+    }
+
+    override suspend fun getKioskActionButtons(): Set<String> = withContext(Dispatchers.IO) {
+        // --- התיקון כאן: שינוי ברירת המחדל לרשימה ריקה ---
+        preferencesManager.loadStringSet(PreferencesManager.KEY_KIOSK_ACTION_BAR_ITEMS, emptySet())
+    }
+
+    override suspend fun setKioskActionButtons(buttons: Set<String>) = withContext(Dispatchers.IO) {
+        preferencesManager.saveStringSet(PreferencesManager.KEY_KIOSK_ACTION_BAR_ITEMS, buttons)
+    }
+
+    override suspend fun getKioskLayoutJson(): String? = withContext(Dispatchers.IO) {
+        preferencesManager.loadString(PreferencesManager.KEY_KIOSK_LAYOUT_JSON, null)
+    }
+
+    override suspend fun setKioskLayoutJson(json: String?) = withContext(Dispatchers.IO) {
+        preferencesManager.saveString(PreferencesManager.KEY_KIOSK_LAYOUT_JSON, json)
+    }
+
+    override suspend fun isKioskSettingsInLockTaskEnabled(): Boolean = withContext(Dispatchers.IO) {
+        preferencesManager.loadBoolean(PreferencesManager.KEY_KIOSK_ALLOW_SETTINGS_IN_LOCK_TASK, true) // Default to true
+    }
+
+    override suspend fun setKioskSettingsInLockTaskEnabled(isEnabled: Boolean) = withContext(Dispatchers.IO) {
+        preferencesManager.saveBoolean(PreferencesManager.KEY_KIOSK_ALLOW_SETTINGS_IN_LOCK_TASK, isEnabled)
     }
 }

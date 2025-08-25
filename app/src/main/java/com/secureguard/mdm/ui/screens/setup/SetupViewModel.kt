@@ -1,10 +1,16 @@
 package com.secureguard.mdm.ui.screens.setup
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.mdm.R
+import com.secureguard.mdm.boot.BootCompletedReceiver
 import com.secureguard.mdm.security.PasswordManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -28,6 +34,7 @@ sealed class SetupEvent {
 
 @HiltViewModel
 class SetupViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val passwordManager: PasswordManager
 ) : ViewModel() {
 
@@ -63,6 +70,7 @@ class SetupViewModel @Inject constructor(
 
             try {
                 passwordManager.createAndSavePassword(password)
+                enableBootReceiver()
                 _setupCompleteEvent.emit(Unit)
             } catch (e: Exception) {
                 // Handle potential errors from password manager
@@ -70,5 +78,15 @@ class SetupViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
+    }
+
+    private fun enableBootReceiver() {
+        val receiver = ComponentName(context, BootCompletedReceiver::class.java)
+        context.packageManager.setComponentEnabledSetting(
+            receiver,
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP
+        )
+        Log.i("SetupViewModel", "BootCompletedReceiver has been programmatically enabled.")
     }
 }

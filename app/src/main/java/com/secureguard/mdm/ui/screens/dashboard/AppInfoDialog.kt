@@ -20,6 +20,8 @@ import com.secureguard.mdm.ui.components.InfoDialog
 
 @Composable
 fun AppInfoDialog(
+    appVersion: String,
+    buildStatus: String,
     isContactEmailVisible: Boolean,
     onCheckForUpdateClick: () -> Unit,
     onDismiss: () -> Unit
@@ -27,7 +29,6 @@ fun AppInfoDialog(
     val context = LocalContext.current
     var showUnofficialWarning by remember { mutableStateOf(false) }
 
-    val buildStatus = stringResource(id = R.string.app_build_status)
     val isOfficial = buildStatus.equals("רשמית", ignoreCase = true)
 
     AlertDialog(
@@ -35,7 +36,7 @@ fun AppInfoDialog(
         title = { Text(stringResource(id = R.string.app_name)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InfoRow("גרסה:", stringResource(id = R.string.app_version))
+                InfoRow("גרסה:", appVersion)
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     InfoRow("סטטוס:", buildStatus, if (isOfficial) Color(0xFF388E3C) else MaterialTheme.colorScheme.error)

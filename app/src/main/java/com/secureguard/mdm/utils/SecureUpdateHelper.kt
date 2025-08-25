@@ -84,7 +84,6 @@ class SecureUpdateHelper @Inject constructor(
      */
     fun coreComponentExists(): Boolean = true
 
-    // --- סוף: לוגיקת אימות חתימה רשמית (מטושטשת) ---
 
     /**
      * Verifies if a downloaded APK file has the same signature as the currently installed app.

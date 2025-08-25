@@ -14,8 +14,11 @@ import com.secureguard.mdm.data.repository.SettingsRepository
 import com.secureguard.mdm.features.impl.BlockInternetVpnFeature
 import com.secureguard.mdm.features.impl.InstallAndProtectNetGuardFeature
 import com.secureguard.mdm.features.registry.CategoryRegistry
-import com.secureguard.mdm.features.registry.FeatureRegistry
 import com.secureguard.mdm.security.PasswordManager
+import com.secureguard.mdm.settingsfeatures.api.SettingsFeature
+import com.secureguard.mdm.settingsfeatures.api.ToggleSetting
+import com.secureguard.mdm.settingsfeatures.impl.*
+import com.secureguard.mdm.settingsfeatures.registry.SettingsRegistry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -58,6 +61,10 @@ class SettingsViewModel @Inject constructor(
         SecureGuardDeviceAdminReceiver.getComponentName(context)
     }
 
+    // --- NEW: Store initial state for comparison ---
+    private var initialProtectionTogglesState: Map<String, Boolean> = emptyMap()
+    private var initialSettingsTogglesState: Map<String, Boolean> = emptyMap()
+
     private var pendingVpnEnableRequest: Boolean = false
 
     init {
@@ -66,17 +73,13 @@ class SettingsViewModel @Inject constructor(
 
     fun onEvent(event: SettingsEvent) {
         when (event) {
-            is SettingsEvent.OnToggleFeature -> handleToggle(event.featureId, event.isEnabled)
+            is SettingsEvent.OnToggleProtectionFeature -> handleProtectionToggle(event.featureId, event.isEnabled)
+            is SettingsEvent.OnVpnPermissionResult -> handleVpnPermissionResult(event.granted)
+            is SettingsEvent.OnToggleSettingChanged -> handleSettingToggle(event.settingId, event.isChecked)
+            is SettingsEvent.OnActionSettingClicked -> handleActionClick(event.settingId)
+            is SettingsEvent.OnLockSettingsConfirmed -> lockSettings(event.allowManualUpdate)
             is SettingsEvent.OnSaveClick -> saveChanges()
             is SettingsEvent.OnSnackbarShown -> _uiState.update { it.copy(snackbarMessage = null) }
-            is SettingsEvent.OnRemoveProtectionRequest -> _passwordPromptState.update { it.copy(isVisible = true) }
-            is SettingsEvent.OnVpnPermissionResult -> handleVpnPermissionResult(event.granted)
-            is SettingsEvent.OnAutoUpdateToggled -> _uiState.update { it.copy(isAutoUpdateEnabled = event.isEnabled) }
-            is SettingsEvent.OnTogglePositionChanged -> _uiState.update { it.copy(isToggleOnStart = event.isStart) }
-            is SettingsEvent.OnControlTypeChanged -> _uiState.update { it.copy(useCheckbox = event.useCheckbox) }
-            is SettingsEvent.OnContactEmailVisibilityChanged -> _uiState.update { it.copy(isContactEmailVisible = event.isVisible) }
-            is SettingsEvent.OnDisableAllUpdatesChanged -> _uiState.update { it.copy(areAllUpdatesDisabled = event.isDisabled) }
-            is SettingsEvent.OnLockSettingsConfirmed -> lockSettings(event.allowManualUpdate)
         }
     }
 
@@ -90,108 +93,188 @@ class SettingsViewModel @Inject constructor(
     private fun loadInitialState() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val isAutoUpdateEnabled = settingsRepository.isAutoUpdateCheckEnabled()
-            val isToggleOnStart = settingsRepository.isToggleOnStart()
-            val useCheckbox = settingsRepository.useCheckbox()
-            val isContactEmailVisible = settingsRepository.isContactEmailVisible()
-            val areAllUpdatesDisabled = settingsRepository.areAllUpdatesDisabled()
-            val isNetGuardInstalled = isNetGuardInstalled()
-            val currentDeviceApi = Build.VERSION.SDK_INT
 
-            val categoryToggles = CategoryRegistry.allCategories.map { category ->
-                val featureToggles = category.features.map { feature ->
-                    var isSupported = currentDeviceApi >= feature.requiredSdkVersion
-                    var conflictReason: Int? = null
+            val protectionCategoryToggles = loadProtectionFeatures()
+            val settingItemsByCategory = loadSettingsFeatures()
 
-                    if (feature.id == BlockInternetVpnFeature.id && isNetGuardInstalled) {
-                        isSupported = false
-                        conflictReason = R.string.conflict_reason_netguard_installed
-                    }
+            // --- NEW: Capture the initial state after loading ---
+            initialProtectionTogglesState = protectionCategoryToggles.flatMap { it.toggles }.associate { it.feature.id to it.isEnabled }
+            initialSettingsTogglesState = settingItemsByCategory.values.flatten().filter { it.feature is ToggleSetting }.associate { it.feature.id to it.isChecked }
 
-                    FeatureToggle(
-                        feature = feature,
-                        isEnabled = settingsRepository.getFeatureState(feature.id),
-                        isSupported = isSupported,
-                        requiredApi = feature.requiredSdkVersion,
-                        conflictReasonResId = conflictReason
-                    )
-                }
-                CategoryToggle(titleResId = category.titleResId, toggles = featureToggles)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    protectionCategoryToggles = protectionCategoryToggles,
+                    settingItemsByCategory = settingItemsByCategory
+                )
             }
-            _uiState.update { it.copy(
-                categoryToggles = categoryToggles,
-                isLoading = false,
-                isAutoUpdateEnabled = isAutoUpdateEnabled,
-                isToggleOnStart = isToggleOnStart,
-                useCheckbox = useCheckbox,
-                isContactEmailVisible = isContactEmailVisible,
-                areAllUpdatesDisabled = areAllUpdatesDisabled
-            ) }
+        }
+    }
+
+    private suspend fun loadProtectionFeatures(): List<ProtectionCategoryToggle> {
+        val isNetGuardInstalled = isNetGuardInstalled()
+        val currentDeviceApi = Build.VERSION.SDK_INT
+        return CategoryRegistry.allCategories.map { category ->
+            val featureToggles = category.features.map { feature ->
+                var isSupported = currentDeviceApi >= feature.requiredSdkVersion
+                var conflictReason: Int? = null
+                if (feature.id == BlockInternetVpnFeature.id && isNetGuardInstalled) {
+                    isSupported = false
+                    conflictReason = R.string.conflict_reason_netguard_installed
+                }
+                FeatureToggle(
+                    feature = feature,
+                    isEnabled = settingsRepository.getFeatureState(feature.id),
+                    isSupported = isSupported,
+                    requiredApi = feature.requiredSdkVersion,
+                    conflictReasonResId = conflictReason
+                )
+            }
+            ProtectionCategoryToggle(titleResId = category.titleResId, toggles = featureToggles)
+        }
+    }
+
+    private suspend fun loadSettingsFeatures(): Map<com.secureguard.mdm.settingsfeatures.api.SettingCategory, List<SettingItemModel>> {
+        // --- START OF MINIMALIST CHANGE ---
+        val availableSettings = SettingsRegistry.allSettings.filter { feature ->
+            if (feature.id == NavigateToKioskModeSetting.id) {
+                // Keep Kiosk setting only if SDK is newer than Nougat (API 24)
+                Build.VERSION.SDK_INT > Build.VERSION_CODES.N
+            } else {
+                true // Keep all other settings
+            }
+        }
+        // --- END OF MINIMALIST CHANGE ---
+
+        return availableSettings // Use the filtered list
+            .map { feature ->
+                val isChecked = if (feature is ToggleSetting) {
+                    when (feature.id) {
+                        ToggleUiPositionSetting.id -> settingsRepository.isToggleOnStart()
+                        ToggleUiControlTypeSetting.id -> settingsRepository.useCheckbox()
+                        ToggleContactEmailSetting.id -> settingsRepository.isContactEmailVisible()
+                        ToggleUpdatesSetting.id -> settingsRepository.areAllUpdatesDisabled()
+                        ShowBootToastSetting.id -> settingsRepository.isShowBootToastEnabled() // <-- Load initial state
+                        else -> false
+                    }
+                } else false
+                SettingItemModel(feature = feature, isChecked = isChecked)
+            }
+            .groupBy { it.feature.category }
+    }
+
+
+    private fun handleActionClick(settingId: String) {
+        when (settingId) {
+            LockSettingsAction.id -> {
+                // This is handled in the screen, which shows the dialog.
+                // The dialog confirmation will call OnLockSettingsConfirmed.
+            }
+            RemoveProtectionAction.id -> {
+                _passwordPromptState.update { it.copy(isVisible = true) }
+            }
+        }
+    }
+
+    private fun handleSettingToggle(settingId: String, isChecked: Boolean) {
+        _uiState.update { currentState ->
+            val updatedMap = currentState.settingItemsByCategory.toMutableMap()
+            for ((category, items) in updatedMap) {
+                val updatedItems = items.map { model ->
+                    if (model.feature.id == settingId) {
+                        model.copy(isChecked = isChecked)
+                    } else {
+                        model
+                    }
+                }
+                updatedMap[category] = updatedItems
+            }
+            currentState.copy(settingItemsByCategory = updatedMap)
         }
     }
 
     private fun saveChanges() {
         viewModelScope.launch {
             val currentState = _uiState.value
-            val wasNetGuardProtectedBeforeSave = settingsRepository.getFeatureState(InstallAndProtectNetGuardFeature.id)
-            val isNetGuardProtectionBeingDisabled = wasNetGuardProtectedBeforeSave &&
-                    currentState.categoryToggles.flatMap { it.toggles }
-                        .find { it.feature.id == InstallAndProtectNetGuardFeature.id }?.isEnabled == false
+            var hasChanges = false
+            var snackbarMessage = context.getString(R.string.dialog_changes_saved_successfully)
 
-            currentState.categoryToggles.flatMap { it.toggles }.forEach { toggle ->
-                toggle.feature.applyPolicy(context, dpm, adminComponentName, toggle.isEnabled)
-                settingsRepository.setFeatureState(toggle.feature.id, toggle.isEnabled)
+            // Save new modular settings, ONLY IF CHANGED
+            currentState.settingItemsByCategory.values.flatten().forEach { model ->
+                if (model.feature is ToggleSetting) {
+                    val initialValue = initialSettingsTogglesState[model.feature.id]
+                    if (initialValue != model.isChecked) {
+                        hasChanges = true
+                        when (model.feature.id) {
+                            ToggleUiPositionSetting.id -> settingsRepository.setToggleOnStart(model.isChecked)
+                            ToggleUiControlTypeSetting.id -> settingsRepository.setUseCheckbox(model.isChecked)
+                            ToggleContactEmailSetting.id -> settingsRepository.setContactEmailVisible(model.isChecked)
+                            ToggleUpdatesSetting.id -> settingsRepository.setAllUpdatesDisabled(model.isChecked)
+                            ShowBootToastSetting.id -> settingsRepository.setShowBootToastEnabled(model.isChecked) // <-- SAVE the new state
+                        }
+                    }
+                }
             }
-            settingsRepository.setAutoUpdateCheckEnabled(currentState.isAutoUpdateEnabled)
-            settingsRepository.setToggleOnStart(currentState.isToggleOnStart)
-            settingsRepository.setUseCheckbox(currentState.useCheckbox)
-            settingsRepository.setContactEmailVisible(currentState.isContactEmailVisible)
-            settingsRepository.setAllUpdatesDisabled(currentState.areAllUpdatesDisabled)
 
-            var snackbarMessage = "ההגדרות נשמרו בהצלחה!"
-            if (isNetGuardProtectionBeingDisabled && isNetGuardInstalled()) {
-                snackbarMessage += "\n" + context.getString(R.string.toast_netguard_can_be_uninstalled)
+            // Save main protection features, ONLY IF CHANGED
+            val wasNetGuardProtectedBeforeSave = initialProtectionTogglesState[InstallAndProtectNetGuardFeature.id] ?: false
+            currentState.protectionCategoryToggles.flatMap { it.toggles }.forEach { toggle ->
+                val initialValue = initialProtectionTogglesState[toggle.feature.id]
+                if (initialValue != toggle.isEnabled) {
+                    hasChanges = true
+                    toggle.feature.applyPolicy(context, dpm, adminComponentName, toggle.isEnabled)
+                    settingsRepository.setFeatureState(toggle.feature.id, toggle.isEnabled)
+
+                    // Special message for NetGuard
+                    if (toggle.feature.id == InstallAndProtectNetGuardFeature.id && wasNetGuardProtectedBeforeSave && !toggle.isEnabled && isNetGuardInstalled()) {
+                        snackbarMessage += "\n" + context.getString(R.string.toast_netguard_can_be_uninstalled)
+                    }
+                }
             }
 
-            _uiState.update { it.copy(snackbarMessage = snackbarMessage) }
-            loadInitialState()
+            if (hasChanges) {
+                _uiState.update { it.copy(snackbarMessage = snackbarMessage) }
+            }
+
+            // Always navigate back, even if no changes were made.
             _sideEffect.emit(SettingsSideEffect.NavigateBack)
         }
     }
+
 
     private fun lockSettings(allowManualUpdate: Boolean) {
         viewModelScope.launch {
             settingsRepository.setAllUpdatesDisabled(true)
             settingsRepository.setAutoUpdateCheckEnabled(false)
+
             settingsRepository.lockSettingsPermanently(allowManualUpdate)
             Log.d("SettingsVM", "SETTINGS PERMANENTLY LOCKED. Allow manual updates: $allowManualUpdate")
             _sideEffect.emit(SettingsSideEffect.NavigateBack)
         }
     }
 
-    private fun handleToggle(featureId: String, isEnabled: Boolean) {
+    private fun handleProtectionToggle(featureId: String, isEnabled: Boolean) {
         if (featureId == BlockInternetVpnFeature.id && isEnabled) {
-            val intent = VpnService.prepare(context)
-            if (intent != null) {
+            if (VpnService.prepare(context) != null) {
                 pendingVpnEnableRequest = true
                 viewModelScope.launch { _vpnPermissionRequestEvent.emit(Unit) }
                 return
             }
         }
         _uiState.update { currentState ->
-            val updatedCategories = currentState.categoryToggles.map { category ->
+            val updatedCategories = currentState.protectionCategoryToggles.map { category ->
                 val updatedToggles = category.toggles.map { toggle ->
                     if (toggle.feature.id == featureId) toggle.copy(isEnabled = isEnabled) else toggle
                 }
                 category.copy(toggles = updatedToggles)
             }
-            currentState.copy(categoryToggles = updatedCategories)
+            currentState.copy(protectionCategoryToggles = updatedCategories)
         }
     }
 
     private fun handleVpnPermissionResult(granted: Boolean) {
         if (granted && pendingVpnEnableRequest) {
-            handleToggle(BlockInternetVpnFeature.id, true)
+            handleProtectionToggle(BlockInternetVpnFeature.id, true)
         } else if (!granted) {
             _uiState.update { it.copy(snackbarMessage = "נדרש אישור להפעלת ה-VPN") }
         }
@@ -218,44 +301,23 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun initiateRemoval() {
         viewModelScope.launch {
             try {
-                Log.d("SettingsVM", "Disabling all protection features...")
-                FeatureRegistry.allFeatures.forEach { feature ->
-                    feature.applyPolicy(context, dpm, adminComponentName, false)
-                    settingsRepository.setFeatureState(feature.id, false)
+                _uiState.value.protectionCategoryToggles.flatMap { it.toggles }.forEach {
+                    it.feature.applyPolicy(context, dpm, adminComponentName, false)
+                    settingsRepository.setFeatureState(it.feature.id, false)
                 }
-                Log.d("SettingsVM", "All features policies have been disabled.")
 
-                Log.d("SettingsVM", "Unhiding all blocked applications...")
                 val blockedApps = settingsRepository.getBlockedAppPackages()
-                if (blockedApps.isNotEmpty()) {
-                    blockedApps.forEach { packageName ->
-                        try {
-                            dpm.setApplicationHidden(adminComponentName, packageName, false)
-                        } catch (e: Exception) {
-                            Log.e("SettingsVM", "Failed to unhide app: $packageName", e)
-                        }
-                    }
-                    Log.d("SettingsVM", "All apps have been unhidden.")
-
-                    Log.d("SettingsVM", "Cleaning up app blocker storage...")
-                    settingsRepository.removeAppsFromCache(blockedApps.toList())
-                    settingsRepository.setBlockedAppPackages(emptySet())
-                    Log.d("SettingsVM", "App blocker storage cleared.")
-                } else {
-                    Log.d("SettingsVM", "No blocked apps to unhide or clean up.")
+                blockedApps.forEach { packageName ->
+                    dpm.setApplicationHidden(adminComponentName, packageName, false)
                 }
-
-                Log.d("SettingsVM", "Clearing device owner...")
+                settingsRepository.removeAppsFromCache(blockedApps.toList())
+                settingsRepository.setBlockedAppPackages(emptySet())
                 dpm.clearDeviceOwnerApp(context.packageName)
                 _triggerUninstallEvent.emit(Unit)
-                Log.d("SettingsVM", "Device owner cleared and uninstall triggered.")
-
             } catch (e: SecurityException) {
-                Log.e("SettingsVM", "Failed to clear device owner.", e)
                 _uiState.update { it.copy(snackbarMessage = "שגיאה בהסרת הרשאות הניהול.") }
             }
         }

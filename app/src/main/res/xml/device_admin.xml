@@ -2,33 +2,25 @@
 <device-admin>
     <!--
       This file declares all the sensitive policies the app might use.
-      Without a declaration here, the system will crash the app with a SecurityException
-      when a sensitive policy is invoked.
+      This is the base version for APIs < 28.
     -->
     <uses-policies>
-        <!-- Allows enforcing password policies (for future use) -->
+        <!-- Allows enforcing password policies -->
         <limit-password />
-        <!-- Allows remotely locking the device (for future use) -->
+        <!-- Allows remotely locking the device -->
         <force-lock />
-        <!-- Allows remotely wiping the device (for future use) -->
+        <!-- Allows remotely wiping the device -->
         <wipe-data />
-        <!-- Allows requiring device storage encryption (for future use) -->
+        <!-- Allows requiring device storage encryption -->
         <encrypted-storage />
 
         <!-- === POLICIES CURRENTLY IN USE === -->
 
         <!-- Policy for BlockCameraFeature -->
         <disable-camera />
-        <!-- Policy for BlockScreenshotFeature -->
-        <disable-screen-capture />
-
-        <!--
-          NOTE: Most other features like blocking Wi-Fi, USB, Safe Boot, etc.,
-          are managed via addUserRestriction(). These restrictions do NOT require
-          an individual policy tag here. This file is only for specific, high-privilege
-          actions like disabling the camera.
-        -->
         <!-- Policy for blocking the lock screen -->
         <disable-keyguard-features />
+
+        <!-- The disable-screen-capture policy is in the xml-v28 version of this file -->
     </uses-policies>
 </device-admin>

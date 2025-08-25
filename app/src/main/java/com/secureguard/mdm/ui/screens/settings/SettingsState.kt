@@ -1,45 +1,53 @@
 package com.secureguard.mdm.ui.screens.settings
 
-// Data class to hold a category title and its list of toggles
-data class CategoryToggle(
+import com.secureguard.mdm.features.api.ProtectionFeature
+import com.secureguard.mdm.settingsfeatures.api.SettingCategory
+import com.secureguard.mdm.settingsfeatures.api.SettingsFeature
+
+// Data class to hold a category of protection features (the main toggles)
+data class ProtectionCategoryToggle(
     val titleResId: Int,
     val toggles: List<FeatureToggle>
 )
 
-// Data class to hold the UI state for a single toggle
+// Data class to hold the UI state for a single protection feature toggle
 data class FeatureToggle(
-    val feature: com.secureguard.mdm.features.api.ProtectionFeature,
+    val feature: ProtectionFeature,
     val isEnabled: Boolean,
     val isSupported: Boolean = true,
     val requiredApi: Int = 0,
     val conflictReasonResId: Int? = null
 )
 
+// Data class to hold a settings feature and its current state (e.g., isChecked for toggles)
+data class SettingItemModel(
+    val feature: SettingsFeature,
+    val isChecked: Boolean = false
+)
+
 data class SettingsUiState(
-    val categoryToggles: List<CategoryToggle> = emptyList(),
+    // State for the main protection features
+    val protectionCategoryToggles: List<ProtectionCategoryToggle> = emptyList(),
+
+    // State for the new modular settings items, grouped by category
+    val settingItemsByCategory: Map<SettingCategory, List<SettingItemModel>> = emptyMap(),
+
     val isLoading: Boolean = true,
     val snackbarMessage: String? = null,
-    val isAutoUpdateEnabled: Boolean = true,
-
-    // --- מצבים חדשים להתאמה אישית ונעילה ---
-    val isToggleOnStart: Boolean = false,
-    val useCheckbox: Boolean = false,
-    val isContactEmailVisible: Boolean = true,
-    val areAllUpdatesDisabled: Boolean = false
+    val isAutoUpdateEnabled: Boolean = true // Kept for the main save logic
 )
 
 sealed class SettingsEvent {
-    data class OnToggleFeature(val featureId: String, val isEnabled: Boolean) : SettingsEvent()
+    // Events for main protection features
+    data class OnToggleProtectionFeature(val featureId: String, val isEnabled: Boolean) : SettingsEvent()
+    data class OnVpnPermissionResult(val granted: Boolean) : SettingsEvent()
+
+    // Generic events for the new settings system
+    data class OnToggleSettingChanged(val settingId: String, val isChecked: Boolean) : SettingsEvent()
+    data class OnActionSettingClicked(val settingId: String) : SettingsEvent()
+    data class OnLockSettingsConfirmed(val allowManualUpdate: Boolean) : SettingsEvent()
+
+    // General events
     object OnSaveClick : SettingsEvent()
     object OnSnackbarShown : SettingsEvent()
-    object OnRemoveProtectionRequest : SettingsEvent()
-    data class OnVpnPermissionResult(val granted: Boolean) : SettingsEvent()
-    data class OnAutoUpdateToggled(val isEnabled: Boolean) : SettingsEvent()
-
-    // --- אירועים חדשים ---
-    data class OnTogglePositionChanged(val isStart: Boolean) : SettingsEvent()
-    data class OnControlTypeChanged(val useCheckbox: Boolean) : SettingsEvent()
-    data class OnContactEmailVisibilityChanged(val isVisible: Boolean) : SettingsEvent()
-    data class OnDisableAllUpdatesChanged(val isDisabled: Boolean) : SettingsEvent()
-    data class OnLockSettingsConfirmed(val allowManualUpdate: Boolean) : SettingsEvent() // <-- שינוי כאן
 }

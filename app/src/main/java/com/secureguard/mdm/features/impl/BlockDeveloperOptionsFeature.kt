@@ -1,3 +1,4 @@
+
 package com.secureguard.mdm.features.impl
 
 import android.app.admin.DevicePolicyManager
@@ -22,14 +23,19 @@ object BlockDeveloperOptionsFeature : ProtectionFeature {
         } else {
             dpm.clearUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES)
         }
+        // FIX: Persist state for the fallback check on APIs < 24
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            context.getSharedPreferences("secure_guard_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean(id, enable).apply()
+        }
     }
 
     override fun isPolicyActive(context: Context, dpm: DevicePolicyManager, admin: ComponentName): Boolean {
-        // --- הוספת בדיקת גרסה ---
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             return dpm.getUserRestrictions(admin).getBoolean(UserManager.DISALLOW_DEBUGGING_FEATURES, false)
         }
-        // On older versions, this specific method isn't available, but we can assume the policy isn't active.
-        return false
+        // FIX: Read from SharedPreferences instead of returning false
+        return context.getSharedPreferences("secure_guard_prefs", Context.MODE_PRIVATE)
+            .getBoolean(id, false)
     }
 }

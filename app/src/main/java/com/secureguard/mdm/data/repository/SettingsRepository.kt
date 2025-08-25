@@ -25,8 +25,10 @@ interface SettingsRepository {
     suspend fun areAllUpdatesDisabled(): Boolean
     suspend fun setAllUpdatesDisabled(isDisabled: Boolean)
     suspend fun isSettingsLocked(): Boolean
-    suspend fun lockSettingsPermanently(allowManualUpdate: Boolean) // <-- שינוי חתימה
-    suspend fun allowManualUpdateWhenLocked(): Boolean // <-- פונקציה חדשה
+    suspend fun lockSettingsPermanently(allowManualUpdate: Boolean)
+    suspend fun allowManualUpdateWhenLocked(): Boolean
+    suspend fun isShowBootToastEnabled(): Boolean
+    suspend fun setShowBootToastEnabled(isEnabled: Boolean)
 
 
     // --- פעולות FRP ---
@@ -41,4 +43,30 @@ interface SettingsRepository {
     suspend fun getBlockedAppsCache(): List<BlockedAppCache>
     suspend fun addAppToCache(appCache: BlockedAppCache)
     suspend fun removeAppsFromCache(packageNames: List<String>)
+
+    // --- Kiosk Mode Settings ---
+    suspend fun isKioskModeEnabled(): Boolean
+    suspend fun setKioskModeEnabled(isEnabled: Boolean)
+    suspend fun getKioskAppPackages(): Set<String>
+    suspend fun setKioskAppPackages(packageNames: Set<String>)
+    suspend fun getKioskBlockedLauncherPackage(): String?
+    suspend fun setKioskBlockedLauncherPackage(packageName: String?)
+    suspend fun getKioskTitle(): String
+    suspend fun setKioskTitle(title: String)
+    suspend fun getKioskBackgroundColor(): Int
+    suspend fun setKioskBackgroundColor(color: Int)
+    // --- הוספה: פונקציות לניהול צבע המבטא (Primary) של הקיוסק ---
+    suspend fun getKioskPrimaryColor(): Int
+    suspend fun setKioskPrimaryColor(color: Int)
+    // ----------------------------------------------------------------
+    suspend fun shouldShowKioskSecureUpdate(): Boolean
+    suspend fun setShouldShowKioskSecureUpdate(shouldShow: Boolean)
+    suspend fun getKioskActionButtons(): Set<String>
+    suspend fun setKioskActionButtons(buttons: Set<String>)
+    // New methods for layout persistence
+    suspend fun getKioskLayoutJson(): String?
+    suspend fun setKioskLayoutJson(json: String?)
+    suspend fun isKioskSettingsInLockTaskEnabled(): Boolean
+    suspend fun setKioskSettingsInLockTaskEnabled(isEnabled: Boolean)
+
 }

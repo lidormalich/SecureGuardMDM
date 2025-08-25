@@ -141,6 +141,8 @@ fun DashboardScreen(
 
     if (showAppInfoDialog) {
         AppInfoDialog(
+            appVersion = stringResource(id = R.string.app_version),
+            buildStatus = stringResource(id = R.string.app_build_status),
             isContactEmailVisible = uiState.isContactEmailVisible,
             onCheckForUpdateClick = { viewModel.onEvent(DashboardEvent.OnManualUpdateCheck) },
             onDismiss = { showAppInfoDialog = false }

@@ -15,14 +15,16 @@ object BlockAddUserFeature : ProtectionFeature {
     override val descriptionRes = R.string.feature_add_user_description
     override val iconRes = R.drawable.ic_person_add_disabled
 
-    // ההגבלה הזו קיימת מ-API 21, ולכן היא תתמוך בכל הגרסאות של האפליקציה.
-    // אין צורך לציין requiredSdkVersion.
-
     override fun applyPolicy(context: Context, dpm: DevicePolicyManager, admin: ComponentName, enable: Boolean) {
         if (enable) {
             dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_USER)
         } else {
             dpm.clearUserRestriction(admin, UserManager.DISALLOW_ADD_USER)
+        }
+        // FIX: Persist state for the fallback check on APIs < 24
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            context.getSharedPreferences("secure_guard_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean(id, enable).apply()
         }
     }
 
@@ -30,6 +32,7 @@ object BlockAddUserFeature : ProtectionFeature {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             return dpm.getUserRestrictions(admin).getBoolean(UserManager.DISALLOW_ADD_USER, false)
         }
+        // Fallback for APIs < 24
         val prefs = context.getSharedPreferences("secure_guard_prefs", Context.MODE_PRIVATE)
         return prefs.getBoolean(id, false)
     }

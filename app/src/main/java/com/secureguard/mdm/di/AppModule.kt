@@ -4,10 +4,18 @@ import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.room.Room
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.secureguard.mdm.boot.impl.ShowToastOnBootTask
 import com.secureguard.mdm.data.db.AppDatabase
 import com.secureguard.mdm.data.db.BlockedAppCacheDao
 import com.secureguard.mdm.data.repository.SettingsRepository
 import com.secureguard.mdm.data.repository.SettingsRepositoryImpl
+import com.secureguard.mdm.kiosk.manager.KioskManager
+import com.secureguard.mdm.kiosk.model.KioskApp
+import com.secureguard.mdm.kiosk.model.KioskFolder
+import com.secureguard.mdm.kiosk.model.KioskItem
+import com.secureguard.mdm.utils.RuntimeTypeAdapterFactory
 import com.secureguard.mdm.utils.SecureUpdateHelper
 import com.secureguard.mdm.utils.update.UpdateManager
 import dagger.Module
@@ -71,5 +79,41 @@ object AppModule {
     @Singleton
     fun provideUpdateManager(@ApplicationContext context: Context, secureUpdateHelper: SecureUpdateHelper): UpdateManager {
         return UpdateManager(context, secureUpdateHelper)
+    }
+
+    /**
+     * Provides the ShowToastOnBootTask as a regular dependency.
+     * The BootTaskRegistry will require this in its constructor.
+     * We no longer use @IntoSet.
+     */
+    @Provides
+    @Singleton
+    fun provideShowToastOnBootTask(
+        @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository
+    ): ShowToastOnBootTask {
+        return ShowToastOnBootTask(context, settingsRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideKioskManager(
+        @ApplicationContext context: Context,
+        dpm: DevicePolicyManager
+    ): KioskManager {
+        return KioskManager(context, dpm)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        val typeFactory = RuntimeTypeAdapterFactory
+            .of(KioskItem::class.java, "type")
+            .registerSubtype(KioskApp::class.java, "app")
+            .registerSubtype(KioskFolder::class.java, "folder")
+
+        return GsonBuilder()
+            .registerTypeAdapterFactory(typeFactory)
+            .create()
     }
 }

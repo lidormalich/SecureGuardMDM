@@ -13,6 +13,9 @@ class PreferencesManager @Inject constructor(private val prefs: SharedPreference
     fun loadBoolean(key: String, defaultValue: Boolean): Boolean = prefs.getBoolean(key, defaultValue)
     fun saveStringSet(key: String, value: Set<String>) = prefs.edit().putStringSet(key, value).apply()
     fun loadStringSet(key: String, defaultValue: Set<String>): Set<String> = prefs.getStringSet(key, defaultValue) ?: defaultValue
+    fun saveInt(key: String, value: Int) = prefs.edit().putInt(key, value).apply()
+    fun loadInt(key: String, defaultValue: Int): Int = prefs.getInt(key, defaultValue)
+
 
     companion object {
         const val KEY_PASSWORD_HASH = "password_hash"
@@ -28,6 +31,21 @@ class PreferencesManager @Inject constructor(private val prefs: SharedPreference
         const val KEY_UI_PREF_SHOW_CONTACT_EMAIL = "ui_pref_show_contact_email"
         const val KEY_UPDATE_PREF_DISABLE_ALL_UPDATES = "update_pref_disable_all_updates"
         const val KEY_SETTINGS_LOCKED_PERMANENTLY = "settings_locked_permanently"
-        const val KEY_ALLOW_MANUAL_UPDATE_WHEN_LOCKED = "allow_manual_update_when_locked" // <-- מפתח חדש
+        const val KEY_ALLOW_MANUAL_UPDATE_WHEN_LOCKED = "allow_manual_update_when_locked"
+        const val KEY_SHOW_BOOT_TOAST = "show_boot_toast"
+
+        // --- Kiosk Mode Keys ---
+        const val KEY_KIOSK_MODE_ENABLED = "kiosk_mode_enabled"
+        const val KEY_KIOSK_APP_PACKAGES = "kiosk_app_packages"
+        const val KEY_KIOSK_LAYOUT_JSON = "kiosk_layout_json" // --- THIS LINE IS ADDED ---
+        const val KEY_KIOSK_TITLE_TEXT = "kiosk_title_text"
+        const val KEY_KIOSK_SHOW_SECURE_UPDATE = "kiosk_show_secure_update"
+        const val KEY_KIOSK_ACTION_BAR_ITEMS = "kiosk_action_bar_items"
+        const val KEY_KIOSK_DATE_FORMAT = "kiosk_date_format" // shhhhhhhhh...
+        const val KEY_KIOSK_BACKGROUND_COLOR = "kiosk_background_color"
+        // --- הוספה: מפתח לשמירת הצבע הראשי (Primary/Accent) של הקיוסק ---
+        const val KEY_KIOSK_PRIMARY_COLOR = "kiosk_primary_color"
+        const val KEY_KIOSK_BLOCKED_LAUNCHER_PKG = "kiosk_blocked_launcher_pkg"
+        const val KEY_KIOSK_ALLOW_SETTINGS_IN_LOCK_TASK = "kiosk_allow_settings_in_lock_task"
     }
 }

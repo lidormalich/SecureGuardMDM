@@ -16,6 +16,9 @@ import androidx.navigation.compose.rememberNavController
 import com.secureguard.mdm.appblocker.ui.AppSelectionScreen
 import com.secureguard.mdm.appblocker.ui.BlockedAppsScreen
 import com.secureguard.mdm.data.repository.SettingsRepository
+import com.secureguard.mdm.kiosk.ui.KioskAppSelectionScreen
+import com.secureguard.mdm.kiosk.ui.KioskCustomizationScreen
+import com.secureguard.mdm.kiosk.ui.KioskManagementScreen
 import com.secureguard.mdm.ui.screens.changepassword.ChangePasswordScreen
 import com.secureguard.mdm.ui.screens.dashboard.DashboardScreen
 import com.secureguard.mdm.ui.screens.frpsettings.FrpSettingsScreen
@@ -33,12 +36,16 @@ object Routes {
     const val CHANGE_PASSWORD = "change_password"
     const val APP_SELECTION = "app_selection"
     const val BLOCKED_APPS_DISPLAY = "blocked_apps_display"
-    const val FRP_SETTINGS = "frp_settings" // <-- נתיב חדש
+    const val FRP_SETTINGS = "frp_settings"
+    const val KIOSK_MANAGEMENT = "kiosk_management"
+    const val KIOSK_APP_SELECTION = "kiosk_app_selection"
+    const val KIOSK_CUSTOMIZATION = "kiosk_customization"
 }
 
 @Composable
 fun AppNavigation(
-    settingsRepository: SettingsRepository = hiltViewModel<DummyViewModel>().settingsRepository
+    settingsRepository: SettingsRepository = hiltViewModel<DummyViewModel>().settingsRepository,
+    startDestinationOverride: String? = null
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -46,15 +53,19 @@ fun AppNavigation(
 
     var refreshTrigger by remember { mutableStateOf(false) }
 
-    val startDestinationState = produceState<String?>(initialValue = null, key1 = refreshTrigger) {
-        value = withContext(Dispatchers.IO) {
-            val isAdmin = dpm.isDeviceOwnerApp(context.packageName)
-            val isSetupComplete = settingsRepository.isSetupComplete()
+    val startDestinationState = produceState<String?>(initialValue = null, key1 = refreshTrigger, key2 = startDestinationOverride) {
+        value = if (startDestinationOverride != null) {
+            startDestinationOverride
+        } else {
+            withContext(Dispatchers.IO) {
+                val isAdmin = dpm.isDeviceOwnerApp(context.packageName)
+                val isSetupComplete = settingsRepository.isSetupComplete()
 
-            when {
-                !isAdmin -> Routes.PROVISIONING
-                !isSetupComplete -> Routes.SETUP
-                else -> Routes.DASHBOARD
+                when {
+                    !isAdmin -> Routes.PROVISIONING
+                    !isSetupComplete -> Routes.SETUP
+                    else -> Routes.DASHBOARD
+                }
             }
         }
     }
@@ -77,10 +88,7 @@ fun AppNavigation(
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToChangePassword = { navController.navigate(Routes.CHANGE_PASSWORD) },
-                    onNavigateToAppSelection = { navController.navigate(Routes.APP_SELECTION) },
-                    onNavigateToBlockedAppsDisplay = { navController.navigate(Routes.BLOCKED_APPS_DISPLAY) },
-                    onNavigateToFrpSettings = { navController.navigate(Routes.FRP_SETTINGS) } // <-- ניווט חדש
+                    onNavigateTo = { route -> navController.navigate(route) }
                 )
             }
             composable(Routes.CHANGE_PASSWORD) {
@@ -94,6 +102,22 @@ fun AppNavigation(
             }
             composable(Routes.FRP_SETTINGS) {
                 FrpSettingsScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Routes.KIOSK_MANAGEMENT) {
+                KioskManagementScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateTo = { route -> navController.navigate(route) }
+                )
+            }
+            composable(Routes.KIOSK_APP_SELECTION) {
+                KioskAppSelectionScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.KIOSK_CUSTOMIZATION) {
+                KioskCustomizationScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     } else {

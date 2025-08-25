@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.net.VpnService
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -26,8 +25,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.secureguard.mdm.R
-import com.secureguard.mdm.features.api.ProtectionFeature
 import com.secureguard.mdm.features.impl.FrpProtectionFeature
+import com.secureguard.mdm.settingsfeatures.api.*
+import com.secureguard.mdm.settingsfeatures.impl.LockSettingsAction
+import com.secureguard.mdm.settingsfeatures.impl.RemoveProtectionAction
 import com.secureguard.mdm.ui.components.InfoDialog
 import com.secureguard.mdm.ui.components.PasswordPromptDialog
 import kotlinx.coroutines.flow.collectLatest
@@ -37,17 +38,13 @@ import kotlinx.coroutines.flow.collectLatest
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
-    onNavigateToChangePassword: () -> Unit,
-    onNavigateToAppSelection: () -> Unit,
-    onNavigateToBlockedAppsDisplay: () -> Unit,
-    onNavigateToFrpSettings: () -> Unit
+    onNavigateTo: (String) -> Unit // Generic navigation callback
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val passwordPromptState by viewModel.passwordPromptState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showUnsupportedDialogFor by remember { mutableStateOf<FeatureToggle?>(null) }
-    var showRemoveConfirmationDialog by remember { mutableStateOf(false) }
     var showLockConfirmationDialog by remember { mutableStateOf(false) }
     var showInfoDialogFor by remember { mutableStateOf<FeatureToggle?>(null) }
     var showFrpWarningDialog by remember { mutableStateOf(false) }
@@ -113,48 +110,42 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
             ) {
-                item {
-                    Text(
-                        text = "ניהול אפליקציות וחסימות",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-                    )
-                }
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettingsActionItem(stringResource(id = R.string.settings_item_select_apps_to_block), R.drawable.ic_manage_apps, onNavigateToAppSelection)
-                        SettingsActionItem(stringResource(id = R.string.settings_item_view_blocked_apps), R.drawable.ic_apps_blocked, onNavigateToBlockedAppsDisplay)
+                // --- NEW RENDERING ORDER ---
+
+                // 1. Render App Management Category
+                uiState.settingItemsByCategory[SettingCategory.APP_MANAGEMENT]?.let { items ->
+                    item {
+                        Text(
+                            text = stringResource(id = SettingCategory.APP_MANAGEMENT.titleRes),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                        )
+                    }
+                    items(items = items, key = { it.feature.id }) { itemModel ->
+                        SettingsItemRenderer(uiState, itemModel, onNavigateTo, viewModel) {
+                            // No special action needed here for this category
+                        }
                     }
                 }
 
-                item {
-                    Text(
-                        text = stringResource(id = R.string.category_ui_and_behavior),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
-                    )
-                }
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettingsToggleItem(
-                            title = stringResource(id = R.string.settings_item_toggle_position),
-                            isChecked = uiState.isToggleOnStart,
-                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnTogglePositionChanged(it)) }
+                // 2. Render UI and Behavior Category
+                uiState.settingItemsByCategory[SettingCategory.UI_AND_BEHAVIOR]?.let { items ->
+                    item {
+                        Text(
+                            text = stringResource(id = SettingCategory.UI_AND_BEHAVIOR.titleRes),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
                         )
-                        SettingsToggleItem(
-                            title = stringResource(id = R.string.settings_item_use_checkbox),
-                            isChecked = uiState.useCheckbox,
-                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnControlTypeChanged(it)) }
-                        )
-                        SettingsToggleItem(
-                            title = stringResource(id = R.string.settings_item_show_contact_email),
-                            isChecked = uiState.isContactEmailVisible,
-                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnContactEmailVisibilityChanged(it)) }
-                        )
+                    }
+                    items(items = items, key = { it.feature.id }) { itemModel ->
+                        SettingsItemRenderer(uiState, itemModel, onNavigateTo, viewModel) {
+                            // No special action
+                        }
                     }
                 }
 
-                uiState.categoryToggles.forEach { category ->
+                // 3. Render all Protection Feature Toggles
+                uiState.protectionCategoryToggles.forEach { category ->
                     item {
                         Text(
                             text = stringResource(id = category.titleResId),
@@ -163,16 +154,21 @@ fun SettingsScreen(
                         )
                     }
                     items(items = category.toggles, key = { it.feature.id }) { toggle ->
+                        val useCheckbox = uiState.settingItemsByCategory[SettingCategory.UI_AND_BEHAVIOR]
+                            ?.find { it.feature.id == "toggle_ui_control_type" }?.isChecked ?: false
+                        val isControlOnStart = uiState.settingItemsByCategory[SettingCategory.UI_AND_BEHAVIOR]
+                            ?.find { it.feature.id == "toggle_ui_position" }?.isChecked ?: false
+
                         Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                             FeatureToggleRow(
                                 toggle = toggle,
-                                useCheckbox = uiState.useCheckbox,
-                                isControlOnStart = uiState.isToggleOnStart,
+                                useCheckbox = useCheckbox,
+                                isControlOnStart = isControlOnStart,
                                 onToggle = { isEnabled ->
                                     if (toggle.feature.id == FrpProtectionFeature.id && isEnabled) {
                                         showFrpWarningDialog = true
                                     } else {
-                                        viewModel.onEvent(SettingsEvent.OnToggleFeature(toggle.feature.id, isEnabled))
+                                        viewModel.onEvent(SettingsEvent.OnToggleProtectionFeature(toggle.feature.id, isEnabled))
                                     }
                                 },
                                 onInfoClick = { showInfoDialogFor = toggle },
@@ -182,23 +178,23 @@ fun SettingsScreen(
                     }
                 }
 
-                item {
-                    Text(
-                        "פעולות מתקדמות",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp))
-                }
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettingsActionItem("הגדר FRP מותאם אישית", R.drawable.ic_frp_shield, onNavigateToFrpSettings)
-                        SettingsActionItem(stringResource(id = R.string.settings_item_change_password), R.drawable.ic_key, onNavigateToChangePassword)
-                        SettingsToggleItem(
-                            title = stringResource(id = R.string.settings_item_disable_all_updates),
-                            isChecked = uiState.areAllUpdatesDisabled,
-                            onCheckedChange = { viewModel.onEvent(SettingsEvent.OnDisableAllUpdatesChanged(it)) }
+                // 4. Render Advanced Actions Category LAST
+                uiState.settingItemsByCategory[SettingCategory.ADVANCED_ACTIONS]?.let { items ->
+                    item {
+                        Text(
+                            text = stringResource(id = SettingCategory.ADVANCED_ACTIONS.titleRes),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
                         )
-                        SettingsActionItem(stringResource(id = R.string.settings_item_lock_settings), R.drawable.ic_remove_protection, onClick = { showLockConfirmationDialog = true }, isDestructive = true)
-                        SettingsActionItem(stringResource(id = R.string.settings_item_remove_protection), R.drawable.ic_uninstall_off, onClick = { showRemoveConfirmationDialog = true }, isDestructive = true)
+                    }
+                    items(items = items, key = { it.feature.id }) { itemModel ->
+                        SettingsItemRenderer(uiState, itemModel, onNavigateTo, viewModel) { featureId ->
+                            // Define special actions for items in this category
+                            when (featureId) {
+                                LockSettingsAction.id -> showLockConfirmationDialog = true
+                                RemoveProtectionAction.id -> viewModel.onEvent(SettingsEvent.OnActionSettingClicked(featureId))
+                            }
+                        }
                     }
                 }
             }
@@ -210,19 +206,6 @@ fun SettingsScreen(
             passwordError = passwordPromptState.error,
             onConfirm = { viewModel.onPasswordPromptEvent(PasswordPromptEvent.OnPasswordEntered(it)) },
             onDismiss = { viewModel.onPasswordPromptEvent(PasswordPromptEvent.OnDismiss) }
-        )
-    }
-
-    if (showRemoveConfirmationDialog) {
-        InfoDialog(
-            title = stringResource(id = R.string.settings_remove_protection_dialog_title),
-            message = stringResource(id = R.string.settings_remove_protection_dialog_message),
-            onDismiss = { showRemoveConfirmationDialog = false },
-            onConfirm = {
-                showRemoveConfirmationDialog = false
-                viewModel.onEvent(SettingsEvent.OnRemoveProtectionRequest)
-            },
-            isDestructive = true
         )
     }
 
@@ -259,12 +242,57 @@ fun SettingsScreen(
             onDismiss = { showFrpWarningDialog = false },
             onConfirm = {
                 showFrpWarningDialog = false
-                viewModel.onEvent(SettingsEvent.OnToggleFeature(FrpProtectionFeature.id, true))
+                viewModel.onEvent(SettingsEvent.OnToggleProtectionFeature(FrpProtectionFeature.id, true))
             },
             isDestructive = true
         )
     }
 }
+
+/**
+ * A helper composable to render a single SettingsItem based on its type.
+ * This avoids code duplication inside the LazyColumn.
+ */
+@Composable
+private fun SettingsItemRenderer(
+    uiState: SettingsUiState,
+    itemModel: SettingItemModel,
+    onNavigate: (String) -> Unit,
+    viewModel: SettingsViewModel,
+    onSpecialAction: (String) -> Unit
+) {
+    val useCheckbox = uiState.settingItemsByCategory[SettingCategory.UI_AND_BEHAVIOR]
+        ?.find { it.feature.id == "toggle_ui_control_type" }?.isChecked ?: false
+
+    when (val feature = itemModel.feature) {
+        is NavigationalSetting -> SettingsActionItem(
+            title = stringResource(id = feature.titleRes),
+            iconRes = feature.iconRes,
+            onClick = { onNavigate(feature.route) }
+        )
+        is DestructiveActionSetting -> SettingsActionItem(
+            title = stringResource(id = feature.titleRes),
+            iconRes = feature.iconRes,
+            onClick = { onSpecialAction(feature.id) },
+            isDestructive = true
+        )
+        is ActionSetting -> SettingsActionItem(
+            title = stringResource(id = feature.titleRes),
+            iconRes = feature.iconRes,
+            onClick = { onSpecialAction(feature.id) }
+        )
+        is ToggleSetting -> SettingsToggleItem(
+            title = stringResource(id = feature.titleRes),
+            isChecked = itemModel.isChecked,
+            onCheckedChange = { isChecked ->
+                viewModel.onEvent(SettingsEvent.OnToggleSettingChanged(feature.id, isChecked))
+            },
+            useCheckbox = useCheckbox,
+            iconRes = feature.iconRes
+        )
+    }
+}
+
 
 @Composable
 private fun LockSettingsConfirmationDialog(
@@ -394,31 +422,39 @@ private fun FeatureToggleRow(
 @Composable
 fun SettingsActionItem(title: String, iconRes: Int, onClick: () -> Unit, isDestructive: Boolean = false) {
     val color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp), tint = color)
-            Spacer(modifier = Modifier.width(16.dp))
+            if (iconRes != 0) {
+                Icon(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp), tint = color)
+                Spacer(modifier = Modifier.width(16.dp))
+            }
             Text(text = title, style = MaterialTheme.typography.bodyLarge, color = color)
         }
     }
 }
 
 @Composable
-fun SettingsToggleItem(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit, iconRes: Int? = null) {
-    Card(modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!isChecked) }) {
+fun SettingsToggleItem(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit, useCheckbox: Boolean, iconRes: Int? = null) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onCheckedChange(!isChecked) }) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             iconRes?.let {
-                Icon(painter = painterResource(id = it), contentDescription = null, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(16.dp))
+                if (it != 0) {
+                    Icon(painter = painterResource(id = it), contentDescription = null, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
             }
             Text(text = title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Switch(checked = isChecked, onCheckedChange = onCheckedChange)
+            if (useCheckbox) {
+                Checkbox(checked = isChecked, onCheckedChange = onCheckedChange)
+            } else {
+                Switch(checked = isChecked, onCheckedChange = onCheckedChange)
+            }
         }
     }
 }
