@@ -128,14 +128,11 @@ class UpdateManager @Inject constructor(
             input.close()
             trySend(100) // Ensure it finishes at 100%
 
-            Log.d(TAG, "Download complete. Verifying signature...")
-            if (secureUpdateHelper.verifyLocalApkSignature(outputFile.absolutePath)) {
-                Log.d(TAG, "Signature verified. Proceeding to MDM install.")
-                installApkSilently(outputFile)
-            } else {
-                Log.e(TAG, "Signature verification failed!")
-                throw Exception(context.getString(R.string.update_error_verification_failed))
-            }
+            // --- התיקון כאן ---
+            // בדיקת החתימה הוסרה מבקשתך. במקור היה כאן תנאי שמוודא את תקינות החתימה.
+            Log.d(TAG, "Download complete. Skipping signature verification and proceeding to MDM install.")
+            installApkSilently(outputFile)
+            // --- סוף התיקון ---
 
         } catch (e: Exception) {
             Log.e(TAG, "Download or installation failed", e)
@@ -165,7 +162,6 @@ class UpdateManager @Inject constructor(
 
             Log.d(TAG, "APK file written to session. Committing installation.")
 
-            // --- התיקון כאן ---
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "מתקין עדכון, האפליקציה תופעל מחדש...", Toast.LENGTH_LONG).show()
             }
